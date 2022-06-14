@@ -31,3 +31,8 @@
 
 #### Token State
  - `[[GOLD],[GREEN],[WHITE],[BLUE],[BLACK],[RED]]`
+
+
+## References
+- https://maxcandocia.com/article/2018/May/04/reinforcement-learning-for-splendor/
+- https://github.com/filipmlynarski/splendor-ai
