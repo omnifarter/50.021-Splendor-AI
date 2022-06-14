@@ -1,8 +1,19 @@
 # For importing the game data (cards, tokens etc.) into their specified data structures
+from enum import IntEnum
+
 import numpy as np
 
 card_path = './cards.csv'
 nobles_path = './nobles.csv'
+
+
+class Colour(IntEnum):
+    GREEN = 0
+    WHITE = 1
+    BLUE = 2
+    BLACK = 3
+    RED = 4
+
 
 class Card:
     def __init__(self, id, data):
@@ -11,16 +22,17 @@ class Card:
 
         self.id = id
         self.tier = data[0]
-        self. value = data[1]
+        self.value = data[1]
         self.type = data[2]
         self.cost = data[3:]
 
     def __str__(self):
         return f"ID: {self.id}, Tier: {self.tier}, Value: {self.value}, Type: {self.type}, Cost: {self.cost}"   
 
+
 class Noble:
     def __init__(self, id, cost):
-    # cost: array of ints representing total card cost for each type required to buy the noble
+        # cost: array of ints representing total card cost for each type required to buy the noble
         self.id = id
         self.cost = cost    
         self.points = 3
@@ -35,7 +47,6 @@ class Board:
         self.all_cards, self.nobles = self._read_data()
         self.open_cards = []
         self.deck_cards = []
-        
 
     def _read_data(self):
         # reads card and nobles into their respective class objects. Stores in array.
@@ -56,20 +67,17 @@ class Board:
         
 
 class TokenBank:
-    def __init__(self):
-        # Start with 5 of each colour
-        self.gold = 5
-        self.green = 5
-        self.white = 5
-        self.blue = 5
-        self.black = 5
-        self.red = 5
+    def __init__(self, num_players):
+        assert 2 <= num_players <= 4, "number of players should be between 2 and 4"
+        starting_tokens = [4, 5, 7][num_players-2]
+        self.tokens = [starting_tokens] * 5 + [5]
 
     def update(self, changes):
         # changes: array of +ve or -ve ints representing the number to 
         # be added/reduced for each token type. Tokens in the bank cannot exceed 5 per type.
         pass
-    
+
+
 class PlayerState:
     def __init__(self, id, turn_order, board: Board, bank: TokenBank):
         self.id = id
@@ -82,8 +90,9 @@ class PlayerState:
 
         # Player inventory
         self.cards = []
+        self.card_counts = [0, 0, 0, 0, 0]
         self.reserved_cards = []
-        self.tokens = []
+        self.tokens = [0, 0, 0, 0, 0, 0]
     
     ## Define player actions
     def takeToken(self, **kwargs):
