@@ -13,6 +13,7 @@ class Colour(IntEnum):
     BLUE = 2
     BLACK = 3
     RED = 4
+    GOLD = 5
 
 
 class Card:
@@ -23,7 +24,7 @@ class Card:
         self.id = id
         self.tier = data[0]
         self.value = data[1]
-        self.type = data[2]
+        self.type = data[2] - 1
         self.cost = data[3:]
 
     def __str__(self):
