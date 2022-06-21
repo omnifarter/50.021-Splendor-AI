@@ -15,7 +15,7 @@ const BoardDeckRow: FunctionComponent<BoardDeckRowProps> = (props:BoardDeckRowPr
             </div>
             <div className="flex gap-4">
                 {props.cards.map((card,index)=>(
-                    <Card {...card} key={index} />
+                    <Card {...card} key={index} forSale={true} />
                 ))}
             </div>
         </div>
