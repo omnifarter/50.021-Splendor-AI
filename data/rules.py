@@ -1,11 +1,17 @@
 # For importing the game data (cards, tokens etc.) into their specified data structures
 from enum import IntEnum
+import math
+import random
 
+from typing import List
 import numpy as np
 
 card_path = './cards.csv'
 nobles_path = './nobles.csv'
 
+"""
+Tokens are positive if player is taking, negative if player is returning.
+""" 
 
 class Colour(IntEnum):
     GREEN = 0
@@ -15,6 +21,11 @@ class Colour(IntEnum):
     RED = 4
     GOLD = 5
 
+class Action(IntEnum):
+    BUY_CARD = 0
+    BUY_RESERVE = 1
+    TAKE_TOKEN = 2
+    RESERVE_CARD = 3
 
 class Card:
     def __init__(self, id, data):
@@ -46,8 +57,8 @@ class Board:
     def __init__(self):
         # read all data
         self.all_cards, self.nobles = self._read_data()
-        self.open_cards = []
-        self.deck_cards = []
+        self.open_cards = [[],[],[]]
+        self.deck_cards = [[],[],[]]
 
     def _read_data(self):
         # reads card and nobles into their respective class objects. Stores in array.
@@ -65,6 +76,22 @@ class Board:
             nobles.append(n)
 
         return cards, nobles
+    
+    def reserveCard(self, card):
+        row_index = -1
+        card_index = -1
+        for i, row in enumerate(self.open_cards):
+            try:
+                card_index = searchCardIndex(row, card)
+                row_index = i
+            except:
+                continue
+        if card_index == -1 or row_index == -1:
+            raise Exception('BOARD_CARD_NOT_FOUND')
+
+        self.open_cards[row_index].pop(card_index)
+        next_card = self.deck_cards[row_index].pop()
+        self.open_cards[row_index].append(next_card)
         
 
 class TokenBank:
@@ -73,10 +100,12 @@ class TokenBank:
         starting_tokens = [4, 5, 7][num_players-2]
         self.tokens = [starting_tokens] * 5 + [5]
 
-    def update(self, changes):
-        # changes: array of +ve or -ve ints representing the number to 
-        # be added/reduced for each token type. Tokens in the bank cannot exceed 5 per type.
-        pass
+    def update(self, tokens:List(int)):
+        for i, t in enumerate(tokens):
+            updatedCount = self.tokens[i] + t
+            if updatedCount > 5:
+                raise Exception('BANK_EXCEED_TOKENS')
+            self.tokens[i] = updatedCount
 
 
 class PlayerState:
@@ -95,24 +124,74 @@ class PlayerState:
         self.reserved_cards = []
         self.tokens = [0, 0, 0, 0, 0, 0]
     
+    def takeAction(self, action:Action, **kwargs):
+        if action == Action.BUY_CARD:
+            self._updateTokens(kwargs['tokens'])
+            self.takeCard(kwargs['card'])
+
+        elif action == Action.BUY_RESERVE:
+            self._updateTokens(kwargs['tokens'])
+            self.buyReserve(kwargs['card'])
+
+        elif action == Action.RESERVE_CARD:
+            self._updateTokens(kwargs['tokens'])
+            self.reserveCard(kwargs['card'])
+
+        elif action == Action.TAKE_TOKEN:
+            self._updateTokens(kwargs['tokens'])
+
+        else:
+            raise Exception('EMPTY_ACTION')
+    
     ## Define player actions
-    def takeToken(self, **kwargs):
+    def takeToken(self, tokens:List(int)):
         # Player is allowed to draw 3 tokens of different colour, or 2 tokens of same colour,
         # provided there are 4 tokens of that colour in the bank
-        pass
+        multiToken = False
+        for i, token in enumerate(tokens):
+            if token > 2 or (token == 2 and multiToken):
+                raise Exception('PLAYER_TAKING_TOO_MANY_TOKENS')
+            elif token == 2:
+                if self.bank.tokens[i] < 4:
+                    raise Exception('BANK_LESS_THAN_4_TOKENS')
+                multiToken = True
+        self._updateTokens(tokens)
 
-    def buyCard(self, card):
+    def takeCard(self, card):
+        self.cards.append(card)
+        self.card_counts += 1
         pass
 
     def buyReserve(self, card):
-        pass
+        card_index = searchCardIndex(self.reserved_cards, card)
+        self.takeCard(card)
+        self.reserved_cards.pop(card_index)
 
     def reserveCard(self, card):
         # Player picks a card on the board or from top of deck to add to their reserve pile
         # Upon reserving a card, award player with 1 gold token
-        pass
+        self.board.reserveCard(card)
 
-    def _returnTokens(self, tokens):
-        # tokens: array of numbers representing how many of each token to return
-        # Player is allowed only 10 tokens at a time. They must return any surplus to the bank.
-        pass
+    def _checkValidToken(self,a:List(int),b:List(int)):
+        for token, i in enumerate(b):
+            if token < a[i]:
+                return False
+        return True
+
+    def _updateTokens(self,tokens:List(int)):
+        if self._checkValidToken(self.tokens, tokens):
+            self.tokens = [t + tokens[i] for i,t in enumerate(self.tokens)]
+            self.bank.update(tokens)
+        else:
+            raise Exception('PLAYER_NOT_ENOUGH_TOKENS')
+
+
+def searchCardIndex(cardList, card):
+        card_index = -1
+        for i, reserved_card in enumerate(cardList):
+            if card.id == reserved_card.id:
+                card_index = i
+                break
+        if card_index == -1:
+            raise Exception('CARD_NOT_FOUND')
+        return card_index
