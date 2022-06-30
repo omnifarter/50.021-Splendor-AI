@@ -38,8 +38,8 @@ class Card:
         self.type = data[2] - 1
         self.cost = data[3:]
 
-    def __str__(self):
-        return f"ID: {self.id}, Tier: {self.tier}, Value: {self.value}, Type: {self.type}, Cost: {self.cost}"   
+    def __repr__(self):
+        return f"Card {self.id}:\nTier: {self.tier} \nValue: {self.value}\nType: {self.type}\nCost: {self.cost}"   
 
 
 class Noble:
@@ -90,19 +90,49 @@ class Board:
             raise Exception('BOARD_CARD_NOT_FOUND')
 
         self.open_cards[row_index].pop(card_index)
+        self._openCard(row_index)
+
+    def _openCard(self, row_index):
         next_card = self.deck_cards[row_index].pop()
         self.open_cards[row_index].append(next_card)
+    
+    def startGame(self):
+        # fill deck cards
+        for card in self.all_cards:
+            self.deck_cards[card.tier - 1].append(card)
         
+        # open 3 cards per row.
+        for row_index in range(len(self.deck_cards)):
+            for i in range(3):
+                self._openCard(row_index)
 
+        self.bank = TokenBank(2)
+        self.player1 = PlayerState(id=0, turn_order=0,board=self,bank=self.bank)
+        self.player2 = PlayerState(id=1,turn_order=1,board=self,bank=self.bank)
+        self.currentPlayer = self.player1
+        self.turn = 1
+        self.points_to_win = 15
+        print("Game started!")
+
+    def endTurn(self, player):
+        print("Player {} ended turn.",player.id)
+        if self.player1.id == player.id:
+            self.currentPlayer = self.player2
+        elif self.player2.id == player.id:
+            self.currentPlayer = self.player1
+            self.turn += 1
+            print("Round ended. Next round: {}".format(self.turn))
+        else:
+            raise Exception("BOARD_INVALID_PLAYER")
 class TokenBank:
     def __init__(self, num_players):
         assert 2 <= num_players <= 4, "number of players should be between 2 and 4"
         starting_tokens = [4, 5, 7][num_players-2]
         self.tokens = [starting_tokens] * 5 + [5]
 
-    def update(self, tokens:List(int)):
+    def update(self, tokens):
         for i, t in enumerate(tokens):
-            updatedCount = self.tokens[i] + t
+            updatedCount = self.tokens[i] - t
             if updatedCount > 5:
                 raise Exception('BANK_EXCEED_TOKENS')
             self.tokens[i] = updatedCount
@@ -113,7 +143,6 @@ class PlayerState:
         self.id = id
         self.turn_order = turn_order
         self.points = 0
-
         # Allows player to reference board and bank states
         self.board = board
         self.bank = bank
@@ -124,6 +153,8 @@ class PlayerState:
         self.reserved_cards = []
         self.tokens = [0, 0, 0, 0, 0, 0]
     
+    def __str__(self):
+        return "\nPlayer {}:\nPoints: {}\nTokens: {}\nCards: {}Reserves: {}".format(self.id,self.points,self.tokens,self.cards,self.reserved_cards)
     def takeAction(self, action:Action, **kwargs):
         if action == Action.BUY_CARD:
             self._updateTokens(kwargs['tokens'])
@@ -142,9 +173,11 @@ class PlayerState:
 
         else:
             raise Exception('EMPTY_ACTION')
-    
+
+        self.board.endTurn(self)
+
     ## Define player actions
-    def takeToken(self, tokens:List(int)):
+    def takeToken(self, tokens):
         # Player is allowed to draw 3 tokens of different colour, or 2 tokens of same colour,
         # provided there are 4 tokens of that colour in the bank
         multiToken = False
@@ -157,10 +190,15 @@ class PlayerState:
                 multiToken = True
         self._updateTokens(tokens)
 
+
     def takeCard(self, card):
         self.cards.append(card)
-        self.card_counts += 1
-        pass
+        self.card_counts[card.type] += 1
+        self.points += card.points
+
+        if self.points >= self.board.points_to_win:
+            print("PLAYER {} HAS WON!".format(self.id))
+        
 
     def buyReserve(self, card):
         card_index = searchCardIndex(self.reserved_cards, card)
@@ -171,14 +209,15 @@ class PlayerState:
         # Player picks a card on the board or from top of deck to add to their reserve pile
         # Upon reserving a card, award player with 1 gold token
         self.board.reserveCard(card)
+        self.tokens[5] += 1
 
-    def _checkValidToken(self,a:List(int),b:List(int)):
+    def _checkValidToken(self,a,b):
         for token, i in enumerate(b):
             if token < a[i]:
                 return False
         return True
 
-    def _updateTokens(self,tokens:List(int)):
+    def _updateTokens(self,tokens):
         if self._checkValidToken(self.tokens, tokens):
             self.tokens = [t + tokens[i] for i,t in enumerate(self.tokens)]
             self.bank.update(tokens)
