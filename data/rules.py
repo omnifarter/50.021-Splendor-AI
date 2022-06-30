@@ -119,7 +119,7 @@ class Board:
     # Called once a player has finished his action.
     # Changes the currentPlayer and updates turn if needed.
     def endTurn(self, player):
-        print("Player {} ended turn.",player.id)
+        print("Player {} ended turn.".format(player.id))
         if self.player1.id == player.id:
             self.currentPlayer = self.player2
         elif self.player2.id == player.id:
@@ -206,8 +206,8 @@ class PlayerState:
     def takeCard(self, card):
         self.cards.append(card)
         self.card_counts[card.type] += 1
-        self.points += card.points
-
+        self.points += card.value
+        
         if self.points >= self.board.points_to_win:
             print("PLAYER {} HAS WON!".format(self.id))
         
@@ -233,13 +233,15 @@ class PlayerState:
             if i == 5:
                 break
 
-            if token < a[i]:
+            # check for buying
+            if token < 0 and token < a[i]:
                 if token + gold_tokens >= a[i]:
                     gold_tokens -= a[i] - token
                     continue
                 else:
                     return False
         return True
+        
     # Internal helper function to update bank tokens.
     def _updateTokens(self,tokens):
         if self._checkValidToken(self.tokens, tokens):
