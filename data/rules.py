@@ -26,6 +26,7 @@ class Action(IntEnum):
     BUY_RESERVE = 1
     TAKE_TOKEN = 2
     RESERVE_CARD = 3
+    BUY_NOBLE = 4
 
 class Card:
     def __init__(self, id, data):
@@ -41,12 +42,11 @@ class Card:
     def __repr__(self):
         return f"Card {self.id}:\nTier: {self.tier} \nValue: {self.value}\nType: {self.type}\nCost: {self.cost}"   
 
-# TODO: implement Nobles
 class Noble:
     def __init__(self, id, cost):
         # cost: array of ints representing total card cost for each type required to buy the noble
         self.id = id
-        self.cost = cost    
+        self.cost = cost
         self.points = 3
 
     def __str__(self):
@@ -160,7 +160,7 @@ class PlayerState:
         self.card_counts = [0, 0, 0, 0, 0]
         self.reserved_cards = []
         self.tokens = [0, 0, 0, 0, 0, 0]
-    
+        self.nobles = []
     def __str__(self):
         return "\nPlayer {}:\nPoints: {}\nTokens: {}\nCards: {}Reserves: {}".format(self.id,self.points,self.tokens,self.cards,self.reserved_cards)
     
@@ -181,6 +181,9 @@ class PlayerState:
         elif action == Action.TAKE_TOKEN:
             self._updateTokens(kwargs['tokens'])
 
+        elif action == Action.BUY_NOBLE:
+            self._updateTokens(kwargs['tokens'])
+            self.buyNoble(kwargs['noble'])
         else:
             raise Exception('EMPTY_ACTION')
 
@@ -250,7 +253,14 @@ class PlayerState:
         else:
             raise Exception('PLAYER_NOT_ENOUGH_TOKENS')
 
-
+    # Player buys a noble card.
+    def buyNoble(self,noble):
+        self.nobles.append(noble)
+        self.points += noble.value
+        
+        if self.points >= self.board.points_to_win:
+            print("PLAYER {} HAS WON!".format(self.id))
+    
 # Helper function to search through a list for a card.
 def searchCardIndex(cardList, card):
         card_index = -1
