@@ -42,6 +42,14 @@ class Card:
     def __repr__(self):
         return f"Card {self.id}:\nTier: {self.tier} \nValue: {self.value}\nType: {self.type}\nCost: {self.cost}"   
 
+    def serialize(self):
+        return {
+            "id":self.id,
+            "tier":self.tier,
+            "value":self.value,
+            "type":self.type,
+            "cost":self.cost
+        }
 class Noble:
     def __init__(self, id, cost):
         # cost: array of ints representing total card cost for each type required to buy the noble
@@ -52,8 +60,14 @@ class Noble:
     def __str__(self):
         return f"ID: {self.id}, Cost: {self.cost}"
 
+    def serialize(self):
+        return {
+            "id":self.id,
+            "cost":self.cost,
+            "points":self.points
+        }
 
-class Board:
+class Board:        
     def __init__(self):
         self.all_cards, self.nobles = self._read_data()
         self.open_cards = [[],[],[]]
@@ -61,8 +75,8 @@ class Board:
 
     # reads card and nobles into their respective class objects. Stores in array.
     def _read_data(self):
-        temp_cards = np.genfromtxt(card_path, dtype=np.int32, delimiter=',', skip_header=1)
-        temp_nobles = np.genfromtxt(nobles_path, dtype=np.int32, delimiter=',', skip_header=1)
+        temp_cards = np.genfromtxt(card_path, dtype=np.int32, delimiter=',', skip_header=1).tolist()
+        temp_nobles = np.genfromtxt(nobles_path, dtype=np.int32, delimiter=',', skip_header=1).tolist()
 
         cards = []
         for i in range(len(temp_cards)):
@@ -76,6 +90,17 @@ class Board:
 
         return cards, nobles
     
+    def returnState(self):
+        return {
+            "deck_cards":[[card.serialize() for card in tier] for tier in self.deck_cards],
+            "open_cards":[[card.serialize() for card in tier] for tier in self.open_cards],
+            "nobles":[noble.serialize() for noble in self.nobles],
+            "player1":self.player1.serialize(),
+            "player2":self.player2.serialize(),
+            "current_player":self.current_player.serialize(),
+            "bank":self.bank.serialize(),
+            "turn":self.turn,
+        }
     # Removes the card from the board, and opens the next top card of the deck. 
     def removeCardFromBoard(self, card):
         row_index = -1
@@ -111,19 +136,19 @@ class Board:
         self.bank = TokenBank(2)
         self.player1 = PlayerState(id=0, turn_order=0,board=self,bank=self.bank)
         self.player2 = PlayerState(id=1,turn_order=1,board=self,bank=self.bank)
-        self.currentPlayer = self.player1
+        self.current_player = self.player1
         self.turn = 1
         self.points_to_win = 15
         print("Game started!")
 
     # Called once a player has finished his action.
-    # Changes the currentPlayer and updates turn if needed.
+    # Changes the current_player and updates turn if needed.
     def endTurn(self, player):
         print("Player {} ended turn.".format(player.id))
         if self.player1.id == player.id:
-            self.currentPlayer = self.player2
+            self.current_player = self.player2
         elif self.player2.id == player.id:
-            self.currentPlayer = self.player1
+            self.current_player = self.player1
             self.turn += 1
             print("Round ended. Next round: {}".format(self.turn))
         else:
@@ -134,6 +159,10 @@ class TokenBank:
         starting_tokens = [4, 5, 7][num_players-2]
         self.tokens = [starting_tokens] * 5 + [5]
 
+    def serialize(self):
+        return {
+            "tokens":self.tokens
+        }
     # update the tokens in the bank.
     def update(self, tokens):
         for i, t in enumerate(tokens):
@@ -161,9 +190,21 @@ class PlayerState:
         self.reserved_cards = []
         self.tokens = [0, 0, 0, 0, 0, 0]
         self.nobles = []
+
     def __str__(self):
         return "\nPlayer {}:\nPoints: {}\nTokens: {}\nCards: {}Reserves: {}".format(self.id,self.points,self.tokens,self.cards,self.reserved_cards)
     
+    def serialize(self):
+        return {
+            "id":self.id,
+            "turn_order":self.turn_order,
+            "points":self.points,
+            "cards":self.cards,
+            "reserved_cards":self.reserved_cards,
+            "card_counts":self.card_counts,
+            "tokens":self.tokens,
+            "nobles":self.nobles
+        }
     # Player to take an action from here
     def takeAction(self, action:Action, **kwargs):
         if action == Action.BUY_CARD:
