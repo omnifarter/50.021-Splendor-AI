@@ -23,7 +23,7 @@ export const colorIndexing:{[color:string]:number} = {
 
 export interface PlayerState {
     cards:CardProps[];
-    reservedCards:CardProps[];
+    reserved_cards:CardProps[];
     tokens:[number,number,number,number,number,number];
     points:number;
 }
@@ -63,8 +63,8 @@ const findRowIndex = (board:BoardState,card:CardProps):number => {
 export const addCardToPlayer = (player:PlayerState, card:CardProps, type:"BUY"|"HOLD") => {
     return {
         cards:type == 'BUY' ? [...player.cards, card] : player.cards,
-        reservedCards: type=='HOLD' ? [...player.reservedCards,card] : player.reservedCards,
-        points: card.point ? player.points + card.point : player.points,
+        reserved_cards: type=='HOLD' ? [...player.reserved_cards,card] : player.reserved_cards,
+        points: card.value ? player.points + card.value : player.points,
         tokens: subtractTokens(player.tokens,card.cost),
     }
 }

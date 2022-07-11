@@ -2,16 +2,16 @@ import React, { useContext } from 'react';
 import logo from './logo.svg';
 import './App.css';
 import Home from './page/Home';
-import {GameContext, useGameProvider} from './helpers/useGameProvider'
+import { QueryClient, QueryClientProvider } from 'react-query';
 
 function App() {
-  const gameProvider = useGameProvider()
+  const queryClient = new QueryClient()
   return (
-    <GameContext.Provider value={gameProvider}>
-      <div className="text-white">
+    <QueryClientProvider client={queryClient}>
+    <div className="text-white">
         <Home />
       </div>
-    </GameContext.Provider>
+    </QueryClientProvider>
   );
 }
 

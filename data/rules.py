@@ -91,6 +91,7 @@ class Board:
         return cards, nobles
     
     def returnState(self):
+        print("deck_cards first row:" , len(self.deck_cards[0]))
         return {
             "deck_cards":[[card.serialize() for card in tier] for tier in self.deck_cards],
             "open_cards":[[card.serialize() for card in tier] for tier in self.open_cards],
@@ -124,13 +125,14 @@ class Board:
     
     # Starts a new game.
     def startGame(self):
+        self.__init__()
         # fill deck cards
         for card in self.all_cards:
             self.deck_cards[card.tier - 1].append(card)
         
-        # open 3 cards per row.
-        for row_index in range(len(self.deck_cards)):
-            for i in range(3):
+        # open 4 cards per row.
+        for row_index in range(3):
+            for i in range(4):
                 self._openCard(row_index)
 
         self.bank = TokenBank(2)

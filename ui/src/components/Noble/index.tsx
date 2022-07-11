@@ -5,7 +5,7 @@ import PlayerCard from "../Card/PlayerCard";
 
 export interface NobleProps {
     points:number
-    cards:[number,number,number,number,number,number]
+    cost:[number,number,number,number,number,number]
 }
  
 const Noble: FunctionComponent<NobleProps> = (props:NobleProps) => {
@@ -19,7 +19,7 @@ const Noble: FunctionComponent<NobleProps> = (props:NobleProps) => {
         >
             <p className="text-xl p-1">{props.points}</p>
             <div className="flex flex-wrap gap-4 mb-4 ml-2">
-                {props.cards.map((card,index)=>(
+                {props.cost.map((card,index)=>(
                     card !== 0 && <div style={{        
                         border:`1px solid ${colorMapping[index]}`,
                         width:'24px',

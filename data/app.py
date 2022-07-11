@@ -1,10 +1,10 @@
 from flask import Flask
 from flask import request
-
+from flask_cors import CORS
 from rules import *
-app = Flask(__name__)
-app.config["DEBUG"] = True
 
+app = Flask(__name__)
+CORS(app)
 board = Board()
 
 @app.route("/")
