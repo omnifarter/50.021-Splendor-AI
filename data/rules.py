@@ -69,7 +69,7 @@ class Noble:
 
 class Board:        
     def __init__(self):
-        self.all_cards, self.nobles = self._read_data()
+        self.all_cards, self.all_nobles = self._read_data()
         self.open_cards = [[],[],[]]
         self.deck_cards = [[],[],[]]
 
@@ -125,6 +125,7 @@ class Board:
     
     # Starts a new game.
     def startGame(self):
+
         self.__init__()
         # fill deck cards
         for card in self.all_cards:
@@ -134,6 +135,9 @@ class Board:
         for row_index in range(3):
             for i in range(4):
                 self._openCard(row_index)
+
+        # choose 3 nobles
+        self._chooseNobles(3)
 
         self.bank = TokenBank(2)
         self.player1 = PlayerState(id=0, turn_order=0,board=self,bank=self.bank)
@@ -155,6 +159,14 @@ class Board:
             print("Round ended. Next round: {}".format(self.turn))
         else:
             raise Exception("BOARD_INVALID_PLAYER")
+        
+    def _chooseNobles(self, number):
+        selected_nobles = []
+        for i in range(number):
+            selected_pos = random.randint(0,len(self.all_nobles))
+            selected_nobles.append(self.all_nobles.pop(selected_pos))
+        self.nobles = selected_nobles
+
 class TokenBank:
     def __init__(self, num_players):
         assert 2 <= num_players <= 4, "number of players should be between 2 and 4"
@@ -303,7 +315,7 @@ class PlayerState:
         
         if self.points >= self.board.points_to_win:
             print("PLAYER {} HAS WON!".format(self.id))
-    
+
 # Helper function to search through a list for a card.
 def searchCardIndex(cardList, card):
         card_index = -1
