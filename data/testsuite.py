@@ -68,9 +68,12 @@ class TestActions(unittest.TestCase):
     def test_illegal_take_double(self):
         self.board.current_player.takeAction(Action.TAKE_TOKEN,tokens=[0,2,0,0,0,0])
         self.assertEqual(self.board.bank.tokens, [4,2,4,4,4,5])
-        self.assertEqual(self.board.current_player, self.board.player2)
-        self.board.current_player.takeAction(Action.TAKE_TOKEN,tokens=[0,2,0,0,0,0])
-        self.assertEqual(self.board.current_player, self.board.player2)
+        self.assertEqual(self.board.current_player.id, self.board.player2.id)
+
+        with self.assertRaises(Exception) as context:
+            self.board.current_player.takeAction(Action.TAKE_TOKEN,tokens=[0,2,0,0,0,0])
+        self.assertTrue('BANK_LESS_THAN_4_TOKENS' in str(context.exception))
+        self.assertEqual(self.board.current_player.id, self.board.player2.id)
         self.assertEqual(self.board.bank.tokens, [4,2,4,4,4,5])
     
         
