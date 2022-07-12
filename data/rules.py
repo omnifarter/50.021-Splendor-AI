@@ -26,7 +26,6 @@ class Action(IntEnum):
     BUY_RESERVE = 1
     TAKE_TOKEN = 2
     RESERVE_CARD = 3
-    BUY_NOBLE = 4
 
 class Card:
     def __init__(self, id, data):
@@ -69,7 +68,7 @@ class Noble:
 
 class Board:        
     def __init__(self):
-        self.all_cards, self.nobles = self._read_data()
+        self.all_cards, self.all_nobles = self._read_data()
         self.open_cards = [[],[],[]]
         self.deck_cards = [[],[],[]]
 
@@ -125,6 +124,7 @@ class Board:
     
     # Starts a new game.
     def startGame(self):
+
         self.__init__()
         # fill deck cards
         for card in self.all_cards:
@@ -134,6 +134,9 @@ class Board:
         for row_index in range(3):
             for i in range(4):
                 self._openCard(row_index)
+
+        # choose 3 nobles
+        self._chooseNobles(3)
 
         self.bank = TokenBank(2)
         self.player1 = PlayerState(id=0, turn_order=0,board=self,bank=self.bank)
@@ -155,6 +158,14 @@ class Board:
             print("Round ended. Next round: {}".format(self.turn))
         else:
             raise Exception("BOARD_INVALID_PLAYER")
+        
+    def _chooseNobles(self, number):
+        selected_nobles = []
+        for i in range(number):
+            selected_pos = random.randint(0,len(self.all_nobles))
+            selected_nobles.append(self.all_nobles.pop(selected_pos))
+        self.nobles = selected_nobles
+
 class TokenBank:
     def __init__(self, num_players):
         assert 2 <= num_players <= 4, "number of players should be between 2 and 4"
@@ -224,12 +235,10 @@ class PlayerState:
         elif action == Action.TAKE_TOKEN:
             self._updateTokens(kwargs['tokens'])
 
-        elif action == Action.BUY_NOBLE:
-            self._updateTokens(kwargs['tokens'])
-            self.buyNoble(kwargs['noble'])
         else:
             raise Exception('EMPTY_ACTION')
 
+        self._checkNobles()
         self.board.endTurn(self)
 
     # Player is allowed to draw 3 tokens of different colour, or 2 tokens of same colour,
@@ -296,14 +305,21 @@ class PlayerState:
         else:
             raise Exception('PLAYER_NOT_ENOUGH_TOKENS')
 
-    # Player buys a noble card.
-    def buyNoble(self,noble):
+    # Noble visits player.
+    def visitNoble(self,noble):
         self.nobles.append(noble)
         self.points += noble.value
         
         if self.points >= self.board.points_to_win:
             print("PLAYER {} HAS WON!".format(self.id))
-    
+
+    # check if player can be visited by noble
+    def _checkNobles(self):
+        for noble in self.board.nobles:
+            if self._checkValidToken(self.tokens,noble.cost):
+                self.visitNoble(noble)
+                break
+        
 # Helper function to search through a list for a card.
 def searchCardIndex(cardList, card):
         card_index = -1
