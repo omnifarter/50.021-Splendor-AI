@@ -26,7 +26,6 @@ class Action(IntEnum):
     BUY_RESERVE = 1
     TAKE_TOKEN = 2
     RESERVE_CARD = 3
-    BUY_NOBLE = 4
 
 class Card:
     def __init__(self, id, data):
@@ -236,12 +235,10 @@ class PlayerState:
         elif action == Action.TAKE_TOKEN:
             self._updateTokens(kwargs['tokens'])
 
-        elif action == Action.BUY_NOBLE:
-            self._updateTokens(kwargs['tokens'])
-            self.buyNoble(kwargs['noble'])
         else:
             raise Exception('EMPTY_ACTION')
 
+        self._checkNobles()
         self.board.endTurn(self)
 
     # Player is allowed to draw 3 tokens of different colour, or 2 tokens of same colour,
@@ -308,14 +305,21 @@ class PlayerState:
         else:
             raise Exception('PLAYER_NOT_ENOUGH_TOKENS')
 
-    # Player buys a noble card.
-    def buyNoble(self,noble):
+    # Noble visits player.
+    def visitNoble(self,noble):
         self.nobles.append(noble)
         self.points += noble.value
         
         if self.points >= self.board.points_to_win:
             print("PLAYER {} HAS WON!".format(self.id))
 
+    # check if player can be visited by noble
+    def _checkNobles(self):
+        for noble in self.board.nobles:
+            if self._checkValidToken(self.tokens,noble.cost):
+                self.visitNoble(noble)
+                break
+        
 # Helper function to search through a list for a card.
 def searchCardIndex(cardList, card):
         card_index = -1
