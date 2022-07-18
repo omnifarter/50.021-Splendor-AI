@@ -238,7 +238,7 @@ class PlayerState:
         else:
             raise Exception('EMPTY_ACTION')
 
-        self._checkNobles()
+        # self._checkNobles()
         self.board.endTurn(self)
 
     # Player is allowed to draw 3 tokens of different colour, or 2 tokens of same colour,
