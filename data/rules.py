@@ -162,7 +162,8 @@ class Board:
     def _chooseNobles(self, number):
         selected_nobles = []
         for i in range(number):
-            selected_pos = random.randint(0,len(self.all_nobles))
+            selected_pos = random.randint(0,len(self.all_nobles) - 1)
+
             selected_nobles.append(self.all_nobles.pop(selected_pos))
         self.nobles = selected_nobles
 
@@ -228,12 +229,12 @@ class PlayerState:
             self._updateTokens(kwargs['tokens'])
             self.buyReserve(kwargs['card'])
 
-        elif action == Action.RESERVE_CARD:
-            self._updateTokens(kwargs['tokens'])
-            self.reserveCard(kwargs['card'])
+        # elif action == Action.RESERVE_CARD:
+        #     self._updateTokens(kwargs['tokens'])
+        #     self.reserveCard(kwargs['card'])
 
         elif action == Action.TAKE_TOKEN:
-            self._updateTokens(kwargs['tokens'])
+            self.takeToken(kwargs['tokens'])
 
         else:
             raise Exception('EMPTY_ACTION')
@@ -308,7 +309,7 @@ class PlayerState:
     # Noble visits player.
     def visitNoble(self,noble):
         self.nobles.append(noble)
-        self.points += noble.value
+        self.points += noble.points
         
         if self.points >= self.board.points_to_win:
             print("PLAYER {} HAS WON!".format(self.id))
