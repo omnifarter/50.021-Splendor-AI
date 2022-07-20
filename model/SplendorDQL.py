@@ -1,3 +1,4 @@
+import json
 import math
 import random
 from data.rules import Board
@@ -69,12 +70,13 @@ class SplendorDQN(nn.Module):
 
         # set up matplotlib
         self.is_ipython = 'inline' in matplotlib.get_backend()
-        if self.is_ipython:
+        if self.is_ipython: 
             from IPython import display
         plt.ion()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = kwargs.pop('model', DQN()) # TODO: init model
+        self.input_dims = kwargs.pop('input_dims', 132)
+        self.model = kwargs.pop('model', DQN(self.input_dims)) # TODO: init model
         self.episode_durations = []
 
         self.batch_size = kwargs.pop('batch_size', 128)
@@ -85,19 +87,16 @@ class SplendorDQN(nn.Module):
         self.target_update = kwargs.pop('target_update', 10)
         self.num_episodes = kwargs.pop('num_episodes', 50)
 
-        self.n_actions = kwargs.pop('n_actions', 27) # TODO: hardcode all actions?
+        self.n_actions = kwargs.pop('n_actions', 27)
 
     ########################## Input Extraction ################################        
 
-    def _extract_inputs(self):
-        pass
-    
     ############################ Training ###########################################
 
     def train(self):
 
-        self.policy_net = DQN(screen_height, screen_width, self.n_actions).to(self.device)
-        self.target_net = DQN(screen_height, screen_width, self.n_actions).to(self.device)
+        self.policy_net = DQN(self.input_dims).to(self.device)
+        self.target_net = DQN(self.input_dims).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
 
@@ -108,7 +107,10 @@ class SplendorDQN(nn.Module):
 
         for i_episode in range(self.num_episodes):
             # Initialize the environment and state
-            state = Board()
+            board = Board()
+            board.startGame()
+            state = board.returnState()
+
             for t in count():
                 # Select and perform an action
                 action = self._select_action(state)
