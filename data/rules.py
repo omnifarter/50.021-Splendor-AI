@@ -42,13 +42,8 @@ class Card:
         return f"Card {self.id}:\nTier: {self.tier} \nValue: {self.value}\nType: {self.type}\nCost: {self.cost}"   
 
     def serialize(self):
-        return {
-            "id":self.id,
-            "tier":self.tier,
-            "value":self.value,
-            "type":self.type,
-            "cost":self.cost
-        }
+        return [self.value, self.type, *self.cost]   
+        
 class Noble:
     def __init__(self, id, cost):
         # cost: array of ints representing total card cost for each type required to buy the noble
@@ -60,11 +55,7 @@ class Noble:
         return f"ID: {self.id}, Cost: {self.cost}"
 
     def serialize(self):
-        return {
-            "id":self.id,
-            "cost":self.cost,
-            "points":self.points
-        }
+        return [*self.cost, self.points]
 
 class Board:        
     def __init__(self):
@@ -91,16 +82,24 @@ class Board:
     
     def returnState(self):
         print("deck_cards first row:" , len(self.deck_cards[0]))
-        return {
-            "deck_cards":[[card.serialize() for card in tier] for tier in self.deck_cards],
-            "open_cards":[[card.serialize() for card in tier] for tier in self.open_cards],
-            "nobles":[noble.serialize() for noble in self.nobles],
-            "player1":self.player1.serialize(),
-            "player2":self.player2.serialize(),
-            "current_player":self.current_player.serialize(),
-            "bank":self.bank.serialize(),
-            "turn":self.turn,
-        }
+        # {
+        #     "deck_cards":[[card.serialize() for card in tier] for tier in self.deck_cards],
+        #     "open_cards":[[card.serialize() for card in tier] for tier in self.open_cards],
+        #     "nobles":[noble.serialize() for noble in self.nobles],
+        #     "player1":self.player1.serialize(),
+        #     "player2":self.player2.serialize(),
+        #     "current_player":self.current_player.serialize(),
+        #     "bank":self.bank.serialize(),
+        #     "turn":self.turn,
+        # }
+        data = np.array([[[card.serialize() for card in tier] for tier in self.open_cards],
+                [noble.serialize() for noble in self.nobles],
+                self.player1.serialize(),
+                self.player2.serialize(),
+                self.bank.serialize()]).flatten()
+               
+        return data
+
     # Removes the card from the board, and opens the next top card of the deck. 
     def removeCardFromBoard(self, card):
         row_index = -1
@@ -173,9 +172,8 @@ class TokenBank:
         self.tokens = [starting_tokens] * 5 + [5]
 
     def serialize(self):
-        return {
-            "tokens":self.tokens
-        }
+        return [self.tokens]
+
     # update the tokens in the bank.
     def update(self, tokens):
         for i, t in enumerate(tokens):
@@ -208,16 +206,13 @@ class PlayerState:
         return "\nPlayer {}:\nPoints: {}\nTokens: {}\nCards: {}Reserves: {}".format(self.id,self.points,self.tokens,self.cards,self.reserved_cards)
     
     def serialize(self):
-        return {
-            "id":self.id,
-            "turn_order":self.turn_order,
-            "points":self.points,
-            "cards":self.cards,
-            "reserved_cards":self.reserved_cards,
-            "card_counts":self.card_counts,
-            "tokens":self.tokens,
-            "nobles":self.nobles
-        }
+        return [
+            self.points,
+            self.cards,
+            self.card_counts,
+            self.tokens,
+        ]
+
     # Player to take an action from here
     def takeAction(self, action:Action, **kwargs):
         if action == Action.BUY_CARD:

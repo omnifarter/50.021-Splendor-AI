@@ -1,6 +1,6 @@
-import gym
 import math
 import random
+from data.rules import Board
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -12,7 +12,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import torchvision.transforms as T
 
 from IPython import display
 
@@ -43,35 +42,21 @@ class ReplayMemory(object):
 
 class DQN(nn.Module):
 
-    def __init__(self, h, w, outputs):
+    def __init__(self, input_dims, output_dims=27):
         super(DQN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
-        self.bn3 = nn.BatchNorm2d(32)
-
+        
+        self.linear_1 = nn.linear(input_dims, 64)
+        self.linear_2 = nn.linear(64, 32)
+        self.linear_3 = nn.linear(32, output_dims)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Number of Linear input connections depends on output of conv2d layers
-        # and therefore the input image size, so compute it.
-        def conv2d_size_out(size, kernel_size = 5, stride = 2):
-            return (size - (kernel_size - 1) - 1) // stride  + 1
-        convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
-        convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
-        linear_input_size = convw * convh * 32
-        self.head = nn.Linear(linear_input_size, outputs)
-
-    # Called with either one element to determine next action, or a batch
-    # during optimization. Returns tensor([[left0exp,right0exp]...]).
     def forward(self, x):
         x = x.to(self.device)
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = F.relu(self.bn3(self.conv3(x)))
-        return self.head(x.view(x.size(0), -1))
-
+        x = F.relu(self.linear_1(x))
+        x = F.relu(self.linear_2(x))
+        x = F.relu(self.linear_3(x))
+        x = F.sigmoid(x)
+        return x
 
 
 ################################## Splendor AI ###########################################
@@ -91,7 +76,6 @@ class SplendorDQN(nn.Module):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = kwargs.pop('model', DQN()) # TODO: init model
         self.episode_durations = []
-        self.env = gym.make('CartPole-v0').unwrapped # TODO: env for splendor
 
         self.batch_size = kwargs.pop('batch_size', 128)
         self.gamma = kwargs.pop('gamma', 0.999)
@@ -101,62 +85,16 @@ class SplendorDQN(nn.Module):
         self.target_update = kwargs.pop('target_update', 10)
         self.num_episodes = kwargs.pop('num_episodes', 50)
 
-        self.resize = T.Compose([T.ToPILImage(),
-                    T.Resize(40, interpolation=Image.CUBIC),
-                    T.ToTensor()])
-
-    def test_screen(self):
-        self.env.reset()
-        plt.figure()
-        plt.imshow(self._get_screen().cpu().squeeze(0).permute(1, 2, 0).numpy(),
-                interpolation='none')
-        plt.title('Example extracted screen')
-        plt.show()
+        self.n_actions = kwargs.pop('n_actions', 27) # TODO: hardcode all actions?
 
     ########################## Input Extraction ################################        
 
-    def _get_cart_location(self, screen_width):
-        world_width = self.env.x_threshold * 2
-        scale = screen_width / world_width
-        return int(self.env.state[0] * scale + screen_width / 2.0)  # MIDDLE OF CART
-
-    def _get_screen(self):
-        # Returned screen requested by gym is 400x600x3, but is sometimes larger
-        # such as 800x1200x3. Transpose it into torch order (CHW).
-        screen = self.env.render(mode='rgb_array').transpose((2, 0, 1))
-        # Cart is in the lower half, so strip off the top and bottom of the screen
-        _, screen_height, screen_width = screen.shape
-        screen = screen[:, int(screen_height*0.4):int(screen_height * 0.8)]
-        view_width = int(screen_width * 0.6)
-        cart_location = self._get_cart_location(screen_width)
-        if cart_location < view_width // 2:
-            slice_range = slice(view_width)
-        elif cart_location > (screen_width - view_width // 2):
-            slice_range = slice(-view_width, None)
-        else:
-            slice_range = slice(cart_location - view_width // 2,
-                                cart_location + view_width // 2)
-        # Strip off the edges, so that we have a square image centered on a cart
-        screen = screen[:, :, slice_range]
-        # Convert to float, rescale, convert to torch tensor
-        # (this doesn't require a copy)
-        screen = np.ascontiguousarray(screen, dtype=np.float32) / 255
-        screen = torch.from_numpy(screen)
-        # Resize, and add a batch dimension (BCHW)
-        return self.resize(screen).unsqueeze(0)
+    def _extract_inputs(self):
+        pass
     
     ############################ Training ###########################################
 
     def train(self):
-
-        # Get screen size so that we can initialize layers correctly based on shape
-        # returned from AI gym. Typical dimensions at this point are close to 3x40x90
-        # which is the result of a clamped and down-scaled render buffer in get_screen()
-        init_screen = self._get_screen()
-        _, _, screen_height, screen_width = init_screen.shape
-
-        # Get number of actions from gym action space
-        self.n_actions = self.env.action_space.n
 
         self.policy_net = DQN(screen_height, screen_width, self.n_actions).to(self.device)
         self.target_net = DQN(screen_height, screen_width, self.n_actions).to(self.device)
@@ -170,10 +108,7 @@ class SplendorDQN(nn.Module):
 
         for i_episode in range(self.num_episodes):
             # Initialize the environment and state
-            self.env.reset()
-            last_screen = self._get_screen()
-            current_screen = self._get_screen()
-            state = current_screen - last_screen
+            state = Board()
             for t in count():
                 # Select and perform an action
                 action = self._select_action(state)
@@ -181,8 +116,7 @@ class SplendorDQN(nn.Module):
                 reward = torch.tensor([reward], device=self.device)
 
                 # Observe new state
-                last_screen = current_screen
-                current_screen = self._get_screen()
+                current_state = '' # TODO: get current state
                 if not done:
                     next_state = current_screen - last_screen
                 else:
