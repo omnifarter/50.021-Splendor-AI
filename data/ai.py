@@ -1,12 +1,16 @@
+from re import I
 from rules import *
 import copy
 
 DEPTH = 3  # set only to odd numbers
 
 POINTS_VALUE = 100
-T3_CARD_VALUE = 30
-T2_CARD_VALUE = 20
-T1_CARD_VALUE = 10  # cards must have a value higher than their tokens
+T3_CARD_VALUE = 40
+T2_CARD_VALUE = 30
+T1_CARD_VALUE = 20  # cards must have a value higher than their tokens
+
+# used to give additional value to buying a card, rather than holding cards.
+CAN_BUY_REGULARIZER = 15
 GOLD_TOKEN_VALUE = 2
 BASE_TOKEN_VALUE = 1
 
@@ -110,47 +114,10 @@ class MinMaxBot:
             except Exception as err:
                 print("ERROR 111: ", err, move)
                 raise err
-            if opponent_action['action'] == Action.BUY_CARD:
-                print('temp board player 1', temp_board.player1.serialize())
-                print('temp board player 2', temp_board.player2.serialize())
-                print('temp board turn', temp_board.current_player.serialize())
-                if depth == 1:
-                    print(
-                        "I am playing as an AI. i want the human to have as low of a score as possible.")
-                    print('This is the move that I just made', move)
-                    print(
-                        "Of all possible moves, this is the best current move so far", best_current_action)
-                    print(
-                        "if the move i just made results in a lower value move for the opponent, i will do it")
-                    print("This is opponent's action", opponent_action)
-                    print("This is best opponent action", best_opponent_action)
-
-                if depth == 2:
-                    print(
-                        "I am playing as a human. i want the AI to have as low of a score as possible.")
-                    print('This is the move that I just made', move)
-                    print(
-                        "Of all possible moves, this is the best current move so far", best_current_action)
-                    print(
-                        "if the move i just made results in a lower value move for the opponent, i will do it")
-                    print("This is opponent's action", opponent_action)
-                    print("This is best opponent action", best_opponent_action)
             if maximize:
                 if opponent_action['value'] > best_opponent_action['value']:
                     best_opponent_action = copy.deepcopy(opponent_action)
                     best_current_action = copy.deepcopy(move)
-                    if depth == 1:
-                        print(
-                            "I am playing as an AI. i want the human to have as low of a score as possible.")
-                        print('This is the move that I just made', move)
-                        print(
-                            "Of all possible moves, this is the best current move so far", best_current_action)
-                        print(
-                            "if the move i just made results in a lower value move for the opponent, i will do it")
-                        print("This is opponent's action", opponent_action)
-                        print("This is best opponent action", best_opponent_action)
-
-
             else:
                 if opponent_action['value'] < best_opponent_action['value']:
                     best_opponent_action = copy.deepcopy(opponent_action)
@@ -204,10 +171,30 @@ class MinMaxBot:
             else:
                 total_card_value += T3_CARD_VALUE
 
-        player1_points = POINTS_VALUE * board.player1.points + \
-            total_card_value + total_token_value
+        can_buy_value = 0
+        can_buy_flag = False
+        for row in board.open_cards:
+            for card in row:
+                try:
+                    # if player can take a card next turn, we assign a arbitary value
+                    spent_tokens = board.player1.tokensForCard(card)
+                    can_buy_value -= (sum(spent_tokens) + CAN_BUY_REGULARIZER)
+                    if card.tier == 1:
+                        can_buy_value += T1_CARD_VALUE
+                    elif card.tier == 2:
+                        can_buy_value += T2_CARD_VALUE
+                    else:
+                        can_buy_value += T3_CARD_VALUE
+                    can_buy_flag = True
+                    break
+                except:
+                    continue
+            if can_buy_flag:
+                break
 
-        #TODO: I need to assign extra value to the state, if the player is able to buy a card the next turn.
+        player1_points = POINTS_VALUE * board.player1.points + \
+            total_card_value + total_token_value + can_buy_value
+
         # AI: player2
         total_token_value = sum(
             [BASE_TOKEN_VALUE * t if i != 5 else GOLD_TOKEN_VALUE * t for i, t in enumerate(board.player2.tokens)])
@@ -221,8 +208,31 @@ class MinMaxBot:
             else:
                 total_card_value += T3_CARD_VALUE
 
+        can_buy_value = 0
+        can_buy_flag = False
+        for row in board.open_cards:
+            for card in row:
+                try:
+                    # if player can take a card next turn, we assign a arbitary value
+                    spent_tokens = board.player2.tokensForCard(card)
+                    can_buy_value -= (sum(spent_tokens) + CAN_BUY_REGULARIZER)
+                    if card.tier == 1:
+                        can_buy_value += T1_CARD_VALUE
+                    elif card.tier == 2:
+                        can_buy_value += T2_CARD_VALUE
+                    else:
+                        can_buy_value += T3_CARD_VALUE
+                    # We must break here, else the AI will keep collecting as much "can_buy" cards without actually buying them.
+                    can_buy_flag = True
+                    break
+
+                except:
+                    continue
+            if can_buy_flag:
+                break
+
         player2_points = POINTS_VALUE * board.player2.points + \
-            total_card_value + total_token_value
+            total_card_value + total_token_value + can_buy_value
 
         return player2_points - player1_points
 

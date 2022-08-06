@@ -232,21 +232,8 @@ class PlayerState:
 
     def takeAction(self, action: Action, **kwargs):
         if action == Action.BUY_CARD:
-            spent_tokens = [0, 0, 0, 0, 0, 0]
-            gold_count = self.tokens[5]
             card = kwargs['card']
-            for i, cost in enumerate(card.cost):
-                if i == 5:
-                    break
-                if cost <= self.tokens[i]:
-                    spent_tokens[i] = -cost
-                else:
-                    spent_tokens[i] = -self.tokens[i]
-                    if gold_count > (cost - self.tokens[i]):
-                        spent_tokens[5] -= (cost - self.tokens[i])
-                        gold_count -= (cost - self.tokens[i])
-                    else:
-                        raise Exception("PLAYER_NOT_ENOUGH_TOKENS")
+            spent_tokens = self.tokensForCard(card)
             self._updateTokens(spent_tokens)
             self.takeCard(card)
 
@@ -267,8 +254,25 @@ class PlayerState:
         # self._checkNobles()
         self.board.endTurn(self)
 
+    def tokensForCard(self, card):
+        spent_tokens = [0, 0, 0, 0, 0, 0]
+        gold_count = self.tokens[5]
+        for i, cost in enumerate(card.cost):
+            if i == 5:
+                break
+            if cost <= self.tokens[i]:
+                spent_tokens[i] = -cost
+            else:
+                spent_tokens[i] = -self.tokens[i]
+                if gold_count > (cost - self.tokens[i]):
+                    spent_tokens[5] -= (cost - self.tokens[i])
+                    gold_count -= (cost - self.tokens[i])
+                else:
+                    raise Exception("PLAYER_NOT_ENOUGH_TOKENS")
+        return spent_tokens
     # Player is allowed to draw 3 tokens of different colour, or 2 tokens of same colour,
     # provided there are 4 tokens of that colour in the bank
+
     def takeToken(self, tokens):
         if tokens[5] > 0:
             raise Exception('PLAYER_CANNOT_TAKE_GOLD_TOKEN')
@@ -304,7 +308,7 @@ class PlayerState:
         self.cards.append(card)
         self.card_counts[card.type] += 1
         self.points += card.value
-
+        self.board.removeCardFromBoard(card)
         if self.points >= self.board.points_to_win:
             print("PLAYER {} HAS WON!".format(self.id))
 
