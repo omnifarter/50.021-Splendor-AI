@@ -11,8 +11,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
 
 from IPython import display
+import sys
 
 ################### References ##################
 # https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
@@ -42,9 +44,9 @@ class DQN(nn.Module):
     def __init__(self, input_dims, output_dims=24):
         super(DQN, self).__init__()
         
-        self.linear_1 = nn.Linear(input_dims, 64)
-        self.linear_2 = nn.Linear(64, 32)
-        self.linear_3 = nn.Linear(32, output_dims)
+        self.linear_1 = nn.Linear(input_dims, 64) # (1, 129) x (129, 64)
+        self.linear_2 = nn.Linear(64, 32) # (1, 64) x (64, 32)
+        self.linear_3 = nn.Linear(32, output_dims) # (1, 32) x (32, out) = (1, out)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def forward(self, x: torch.Tensor):
@@ -54,6 +56,18 @@ class DQN(nn.Module):
         x = F.relu(self.linear_3(x))
         x = torch.sigmoid(x)
         return x
+
+class BatchData(Dataset):
+    def __init__(self, data):
+        # data is a list of n input states, where n is the batch size
+        self.states_data = data
+        
+    def __len__(self):
+        return len(self.states_data)
+
+    def __getitem__(self, index):
+        data = self.states_data[index]
+        return data
 
 
 ################################## Splendor AI ###########################################
@@ -72,8 +86,9 @@ class SplendorDQN(nn.Module):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.input_dims = kwargs.pop('input_dims', 129)
-        self.model = kwargs.pop('model', DQN(self.input_dims)) # TODO: init model
         self.episode_durations = []
+        self.Transition = namedtuple('Transition',
+                        ('state', 'action', 'next_state', 'reward'))
 
         self.batch_size = kwargs.pop('batch_size', 128)
         self.gamma = kwargs.pop('gamma', 0.999)
@@ -85,10 +100,7 @@ class SplendorDQN(nn.Module):
 
         self.n_actions = kwargs.pop('n_actions', 24) 
 
-    ############################ Training ###########################################
-
-    def train(self):
-
+        # init model
         self.policy_net = DQN(self.input_dims).to(self.device)
         self.target_net = DQN(self.input_dims).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -99,7 +111,14 @@ class SplendorDQN(nn.Module):
 
         self.steps_done = 0
 
+    ############################ Training ###########################################
+
+    def train(self):
+        sys.stdout = open('../save/log.txt', 'w')
+        total_wins = 0
+
         for i_episode in range(self.num_episodes):
+            print( f"============ Game {i_episode}: Start! ================")
             # Initialize the environment and state
             board = Board()
             state = board.getState()
@@ -108,17 +127,20 @@ class SplendorDQN(nn.Module):
                 # Select and perform an action
                 action = self._select_action(state)
                 reward, done = board.playerAction(action.item())
-                
+                             
                             
                 if not done:
                     # game not over, continue to next state
                     next_state =  board.getState()
                 else:
                     # someone won, get reward value (sparse rewards)
-                    next_state = None
-                    reward = torch.tensor([reward], device=self.device)
-                    self.memory.push(state, action, next_state, reward)  # Store the transition in memory
-                   
+                    next_state = None                    
+                    if reward == 3:
+                        # Player 0 won, achieved goal
+                        total_wins += 1
+
+                reward = torch.tensor([reward], device=self.device)   
+                self.memory.push(state, action, next_state, reward)  # Store the transition in memory   
                 state = next_state # Move to the next state
 
                 # Perform one step of the optimization (on the policy network)
@@ -134,8 +156,11 @@ class SplendorDQN(nn.Module):
         print('Complete')
         self._save()
         plt.ioff()
+        plt.figtext(.6, .8, f"Games Won: {total_wins} / {self.num_episodes}")
         plt.savefig(f'../save/graph.png')
         plt.show()
+        sys.stdout.close()
+        return
         
 
     def _select_action(self, state: torch.Tensor):
@@ -185,24 +210,32 @@ class SplendorDQN(nn.Module):
         # (a final state would've been the one after which simulation ended)
         non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
                                             batch.next_state)), device=self.device, dtype=torch.bool)
-        non_final_next_states = torch.cat([s for s in batch.next_state
-                                                    if s is not None])
-        state_batch = torch.cat(batch.state)
+        non_final_next_states = [s for s in batch.next_state
+                                                    if s is not None]
+        non_final_loader = DataLoader(BatchData(non_final_next_states))
+
+        state_dataset = BatchData(batch.state)
+        state_batch = DataLoader(state_dataset)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
-        state_action_values = self.policy_net(state_batch).gather(1, action_batch)
-
+        values = torch.empty((128, 24), device=self.device)
+        for i, batch in enumerate(state_batch):
+            values[non_final_mask] = self.policy_net(batch)
+        
+        state_action_values = values.gather(1, action_batch)
+    
         # Compute V(s_{t+1}) for all next states.
         # Expected values of actions for non_final_next_states are computed based
         # on the "older" target_net; selecting their best reward with max(1)[0].
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
-        next_state_values = torch.zeros(self.batch_size, device=self.device)
-        next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
+        next_state_values = torch.zeros(self.batch_size, device=self.device) # (128,)
+        for i, batch in enumerate(non_final_loader):
+            next_state_values[i] = self.target_net(batch).max(1)[0].detach()
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 

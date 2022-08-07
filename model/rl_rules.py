@@ -162,17 +162,18 @@ class Board:
             # Player buys a card, 9 ways
             row = (action_index + 1) // 3 - 1
             col = (action_index + 1) % 3
-            card = self.open_cards[row].pop(col)
 
-            reward = card.value
+            if col in range(len(self.open_cards[row])):
+                card = self.open_cards[row].pop(col)
+                reward = card.value
 
-            # Update player states
-            self.current_player.updateCards(card)
-            self.current_player.updateTokens(card.cost, subtract=True)
+                # Update player states
+                self.current_player.updateCards(card)
+                self.current_player.updateTokens(card.cost, subtract=True)
 
-            # Update board states
-            self._draw_cards(row, 1)
-            self.bank.update(card.cost)
+                # Update board states
+                self._draw_cards(row, 1)
+                self.bank.update(card.cost)
 
         elif action_index in range(9, 24):
             # Player takes a token, 15 ways
