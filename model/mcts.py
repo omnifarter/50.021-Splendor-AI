@@ -1,5 +1,6 @@
 # References:
 # https://github.com/asdfjkl/neural_network_chess
+import random
 import typing
 from numbers import Number
 from typing import Any, Callable, List, Tuple
@@ -48,7 +49,7 @@ class Node:
         @return: the valuation of the position
         """
         # TODO get all moves
-        moves = []
+        moves = range(26)
         for m in moves:
             # TODO create a new child node, append to childEdgeNode list
             pass
@@ -58,7 +59,7 @@ class Node:
         for edge, _ in self.childEdgeNode:
             edge.P = policy[edge.move]
             prob_sum += edge.P
-        for edge,_ in self.childEdgeNode
+        for edge,_ in self.childEdgeNode:
             edge.P /= prob_sum
         return evaluation
         
@@ -80,7 +81,7 @@ class MCTS:
         if node.is_leaf():
             return node
         
-        max_uct_child = None
+        max_uct_children = []
         max_uct_value = float("-inf")
         
         for edge, child in node.childEdgeNode:
@@ -92,6 +93,16 @@ class MCTS:
             uct_val_child = val + uct_val
             if uct_val_child > max_uct_value:
                 max_uct_value = uct_val_child
-                max_uct_child = child
+                max_uct_children = [child]
+            elif uct_val_child == max_uct_value:
+                max_uct_children.append(child)
+        if not max_uct_children:
+            raise ValueError("could not find child with best value")
+        else:
+            return self.select(random.choice(max_uct_children))
 
-        best_children = []
+    def expand_and_eval(self, node: Node):
+        pass
+
+def random_eval(board: rl_rules.Board):
+    policy = [1]*24

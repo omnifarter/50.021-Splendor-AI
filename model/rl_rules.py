@@ -42,7 +42,7 @@ class Noble:
 
 class TokenBank:
     def __init__(self):
-        self.tokens = [4] * 5
+        self.tokens = [5] * 5
 
     def serialize(self):
         return self.tokens
@@ -185,11 +185,11 @@ class Board:
             reward = 1
             idx = action_index - 9
             options = {
-                0 : [3, 0, 0, 0, 0],
-                1: [0, 3, 0, 0, 0],
-                2: [0, 0, 3, 0, 0],
-                3: [0, 0, 0, 3, 0],
-                4: [0, 0, 0, 0, 3],
+                0 : [2, 0, 0, 0, 0],
+                1: [0, 2, 0, 0, 0],
+                2: [0, 0, 2, 0, 0],
+                3: [0, 0, 0, 2, 0],
+                4: [0, 0, 0, 0, 2],
                 5: [1, 1, 1, 0, 0],
                 6: [1, 1, 0, 1, 0],
                 7: [1, 1, 0, 0, 1],
@@ -213,6 +213,50 @@ class Board:
             reward = 3 if check_winner == self.list_players[0] else -1 # always favour player 0
         done = True if check_winner else False
         return reward, done
+
+    def can_take_tokens(self, tokens):
+        return all(request_token <= bank_token and ((request_token < 2) or (bank_token >= 4))
+                   for request_token, bank_token in zip(tokens, self.bank.tokens))
+
+    def can_buy_card(self, player: PlayerState, card:Card):
+        # doesn't work with gold tokens
+        return all(cost_token <= player_token + player_card
+                   for player_token, player_card, cost_token in zip(player.tokens, player.card_counts, card.cost))
+
+    def can_take_action(self, action_index):
+        if action_index in range(0, 9):
+            # Player buys a card, 9 ways
+            row = (action_index + 1) // 3 - 1
+            col = (action_index + 1) % 3
+            return self.can_buy_card(self.current_player, self.open_cards[row][col])
+
+        elif action_index in range(9, 24):
+            # Player takes a token, 15 ways
+            idx = action_index - 9
+            options = {
+                0: [2, 0, 0, 0, 0],
+                1: [0, 2, 0, 0, 0],
+                2: [0, 0, 2, 0, 0],
+                3: [0, 0, 0, 2, 0],
+                4: [0, 0, 0, 0, 2],
+                5: [1, 1, 1, 0, 0],
+                6: [1, 1, 0, 1, 0],
+                7: [1, 1, 0, 0, 1],
+                8: [1, 0, 1, 1, 0],
+                9: [1, 0, 1, 0, 1],
+                10: [1, 0, 0, 1, 1],
+                11: [0, 1, 1, 1, 0],
+                12: [0, 1, 1, 0, 1],
+                13: [0, 1, 0, 1, 1],
+                14: [0, 0, 1, 1, 1]
+                }
+            return self.can_take_tokens(options[idx])
+
+    def possible_actions(self):
+        return [action for action in range(24) if self.can_take_action(action)]
+
+    def possible_actions_mask(self):
+        return [int(self.can_take_action(action)) for action in range(24)]
 
     def _read_data(self):
         temp_cards = np.genfromtxt(card_path, dtype=np.int32, delimiter=',', skip_header=1).tolist()
