@@ -169,16 +169,25 @@ def random_eval(iter=1, max_moves=100):
 
 
 if __name__ == "__main__":
+    player = 0
     board = rl_rules.Board()
+    mcts = MCTS(random_eval())
     for i in itertools.count():
-        mcts = MCTS(random_eval())
+        print(board)
         edge = Edge(None, None)
         node = Node(board, edge)
-        move_probs = mcts.search(node)
-        move = max(move_probs, key=lambda t: t[1])
-        print(board)
-        print(board.human_action_description(move[0]))
-        reward, done = board.playerAction(move[0])
+        if player == 0:
+            move_probs = mcts.search(node, select_timeout=1)
+            move = max(move_probs, key=lambda t: t[1])
+            print(board.human_action_description(move[0]))
+            reward, done = board.playerAction(move[0])
+        else:
+            for m in board.possible_actions():
+                print(f"{m}: {board.human_action_description(m)}")
+            move = int(input("Make your move: "))
+            print(board.human_action_description(move))
+            reward, done = board.playerAction(move)
         if done:
             print(f"Player {0 if reward > 0 else 1} wins after {i//2 + 1} moves!")
             break
+        player = 1 - player

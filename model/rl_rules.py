@@ -133,7 +133,7 @@ class Board:
         self.player2 = PlayerState(id=1,turn_order=1)
         self.list_players = [self.player1, self.player2]
         self.cycle_players = itertools.cycle(self.list_players)
-        self.current_player = self.player1
+        self.current_player = next(self.cycle_players)
         self.turn = 1
         self.points_to_win = 15
 
@@ -187,6 +187,7 @@ class Board:
         
     def playerAction(self, action_index):
         # action index is a number between 0 to 12+16=28
+        assert(self.can_take_action(action_index))
         reward = 0
         if action_index in range(0, 12):
             # Player buys a card, 9 ways
