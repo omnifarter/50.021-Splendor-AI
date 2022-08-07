@@ -41,7 +41,7 @@ class ReplayMemory(object):
 
 class DQN(nn.Module):
 
-    def __init__(self, input_dims, output_dims=24):
+    def __init__(self, input_dims, output_dims=27):
         super(DQN, self).__init__()
         
         self.linear_1 = nn.Linear(input_dims, 64) # (1, 129) x (129, 64)
@@ -98,7 +98,7 @@ class SplendorDQN(nn.Module):
         self.target_update = kwargs.pop('target_update', 10)
         self.num_episodes = kwargs.pop('num_episodes', 50)
 
-        self.n_actions = kwargs.pop('n_actions', 24) 
+        self.n_actions = kwargs.pop('n_actions', 27) 
 
         # init model
         self.policy_net = DQN(self.input_dims).to(self.device)
@@ -156,7 +156,7 @@ class SplendorDQN(nn.Module):
         print('Complete')
         self._save()
         plt.ioff()
-        plt.figtext(.6, .8, f"Games Won: {total_wins} / {self.num_episodes}")
+        plt.figtext(.6, .8, f"Games Won: {total_wins} / {self.num_episodes}", size=12)
         plt.savefig(f'../save/graph.png')
         plt.show()
         sys.stdout.close()
@@ -222,7 +222,7 @@ class SplendorDQN(nn.Module):
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
-        values = torch.empty((128, 24), device=self.device)
+        values = torch.empty((128, 27), device=self.device)
         for i, batch in enumerate(state_batch):
             values[non_final_mask] = self.policy_net(batch)
         

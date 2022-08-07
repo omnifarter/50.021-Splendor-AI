@@ -158,10 +158,11 @@ class Board:
     def playerAction(self, action_index):
         # action index is a number between 0 to 26
         reward = 0
-        if action_index in range(0, 9):
-            # Player buys a card, 9 ways
-            row = (action_index + 1) // 3 - 1
-            col = (action_index + 1) % 3
+        if action_index in range(0, 12):
+            # Player buys a card, 12 ways
+            row = (action_index + 1) // 4 - 1
+            col = (action_index + 1) % 4
+            print(row)
 
             if col in range(len(self.open_cards[row])):
                 card = self.open_cards[row].pop(col)
@@ -175,16 +176,16 @@ class Board:
                 self._draw_cards(row, 1)
                 self.bank.update(card.cost)
 
-        elif action_index in range(9, 24):
+        elif action_index in range(11, 27):
             # Player takes a token, 15 ways
             reward = 1
-            idx = action_index - 9
+            idx = action_index - 12
             options = {
-                0 : [3, 0, 0, 0, 0],
-                1: [0, 3, 0, 0, 0],
-                2: [0, 0, 3, 0, 0],
-                3: [0, 0, 0, 3, 0],
-                4: [0, 0, 0, 0, 3],
+                0 : [2, 0, 0, 0, 0],
+                1: [0, 2, 0, 0, 0],
+                2: [0, 0, 2, 0, 0],
+                3: [0, 0, 0, 2, 0],
+                4: [0, 0, 0, 0, 2],
                 5: [1, 1, 1, 0, 0],
                 6: [1, 1, 0, 1, 0],
                 7: [1, 1, 0, 0, 1],
