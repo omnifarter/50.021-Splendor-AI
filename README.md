@@ -1,4 +1,5 @@
-# 50.021-Splendor-AI
+50.021 Artificial Intelligence
+# SplendorAI
 
 ## Project Description
 Splendor is a board game of token-collecting and card development, which can be played with 2-4 players. In this project, we attempt to create an AI that is able to understand the goal of the game and play substantially well against humans. 
@@ -9,7 +10,7 @@ For this project, the game will be played by 2 players. At each turn, a player c
 
 
 ## Attempted Solutions
-- MinMax Algorithm (has GUI)
+- MiniMax Algorithm (has GUI)
     - see `./data` and `./ui`
 - Monte-Carlo Tree Search
     - see: `./model/mcts.py` and `./model/mcts_rules.py`
@@ -31,3 +32,4 @@ npm start
 ## References
 - https://maxcandocia.com/article/2018/May/04/reinforcement-learning-for-splendor/
 - https://github.com/filipmlynarski/splendor-ai
+- https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
