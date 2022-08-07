@@ -11,7 +11,8 @@ nobles_path = './nobles.csv'
 
 """
 Tokens are positive if player is taking, negative if player is returning.
-""" 
+"""
+
 
 class Colour(IntEnum):
     GREEN = 0
@@ -21,11 +22,13 @@ class Colour(IntEnum):
     RED = 4
     GOLD = 5
 
+
 class Action(IntEnum):
     BUY_CARD = 0
     BUY_RESERVE = 1
     TAKE_TOKEN = 2
     RESERVE_CARD = 3
+
 
 class Card:
     def __init__(self, id, data):
@@ -39,11 +42,18 @@ class Card:
         self.cost = data[3:]
 
     def __repr__(self):
-        return f"Card {self.id}:\nTier: {self.tier} \nValue: {self.value}\nType: {self.type}\nCost: {self.cost}"   
+        return f"Card {self.id}:\nTier: {self.tier} \nValue: {self.value}\nType: {self.type}\nCost: {self.cost}"
 
     def serialize(self):
-        return [self.value, self.type, *self.cost]   
-        
+        return {
+            "id": self.id,
+            "tier": self.tier,
+            "value": self.value,
+            "type": self.type,
+            "cost": self.cost
+        }
+
+
 class Noble:
     def __init__(self, id, cost):
         # cost: array of ints representing total card cost for each type required to buy the noble
@@ -55,18 +65,25 @@ class Noble:
         return f"ID: {self.id}, Cost: {self.cost}"
 
     def serialize(self):
-        return [*self.cost, self.points]
+        return {
+            "id": self.id,
+            "cost": self.cost,
+            "points": self.points
+        }
 
-class Board:        
+
+class Board:
     def __init__(self):
         self.all_cards, self.all_nobles = self._read_data()
-        self.open_cards = [[],[],[]]
-        self.deck_cards = [[],[],[]]
+        self.open_cards = [[], [], []]
+        self.deck_cards = [[], [], []]
 
     # reads card and nobles into their respective class objects. Stores in array.
     def _read_data(self):
-        temp_cards = np.genfromtxt(card_path, dtype=np.int32, delimiter=',', skip_header=1).tolist()
-        temp_nobles = np.genfromtxt(nobles_path, dtype=np.int32, delimiter=',', skip_header=1).tolist()
+        temp_cards = np.genfromtxt(
+            card_path, dtype=np.int32, delimiter=',', skip_header=1).tolist()
+        temp_nobles = np.genfromtxt(
+            nobles_path, dtype=np.int32, delimiter=',', skip_header=1).tolist()
 
         cards = []
         for i in range(len(temp_cards)):
@@ -79,28 +96,20 @@ class Board:
             nobles.append(n)
 
         return cards, nobles
-    
-    def returnState(self):
-        print("deck_cards first row:" , len(self.deck_cards[0]))
-        # {
-        #     "deck_cards":[[card.serialize() for card in tier] for tier in self.deck_cards],
-        #     "open_cards":[[card.serialize() for card in tier] for tier in self.open_cards],
-        #     "nobles":[noble.serialize() for noble in self.nobles],
-        #     "player1":self.player1.serialize(),
-        #     "player2":self.player2.serialize(),
-        #     "current_player":self.current_player.serialize(),
-        #     "bank":self.bank.serialize(),
-        #     "turn":self.turn,
-        # }
-        data = np.array([[[card.serialize() for card in tier] for tier in self.open_cards],
-                [noble.serialize() for noble in self.nobles],
-                self.player1.serialize(),
-                self.player2.serialize(),
-                self.bank.serialize()]).flatten()
-               
-        return data
 
-    # Removes the card from the board, and opens the next top card of the deck. 
+    def returnState(self):
+        return {
+            "deck_cards": [[card.serialize() for card in tier] for tier in self.deck_cards],
+            "open_cards": [[card.serialize() for card in tier] for tier in self.open_cards],
+            # "nobles":[noble.serialize() for noble in self.nobles],
+            "player1": self.player1.serialize(),
+            "player2": self.player2.serialize(),
+            "current_player": self.current_player.serialize(),
+            "bank": self.bank.serialize(),
+            "turn": self.turn,
+        }
+    # Removes the card from the board, and opens the next top card of the deck.
+
     def removeCardFromBoard(self, card):
         row_index = -1
         card_index = -1
@@ -120,7 +129,7 @@ class Board:
     def _openCard(self, row_index):
         next_card = self.deck_cards[row_index].pop()
         self.open_cards[row_index].append(next_card)
-    
+
     # Starts a new game.
     def startGame(self):
 
@@ -128,18 +137,20 @@ class Board:
         # fill deck cards
         for card in self.all_cards:
             self.deck_cards[card.tier - 1].append(card)
-        
+
         # open 4 cards per row.
         for row_index in range(3):
             for i in range(4):
                 self._openCard(row_index)
 
         # choose 3 nobles
-        self._chooseNobles(3)
+        # self._chooseNobles(3)
 
         self.bank = TokenBank(2)
-        self.player1 = PlayerState(id=0, turn_order=0,board=self,bank=self.bank)
-        self.player2 = PlayerState(id=1,turn_order=1,board=self,bank=self.bank)
+        self.player1 = PlayerState(
+            id=0, turn_order=0, board=self, bank=self.bank)
+        self.player2 = PlayerState(
+            id=1, turn_order=1, board=self, bank=self.bank)
         self.current_player = self.player1
         self.turn = 1
         self.points_to_win = 15
@@ -148,22 +159,21 @@ class Board:
     # Called once a player has finished his action.
     # Changes the current_player and updates turn if needed.
     def endTurn(self, player):
-        print("Player {} ended turn.".format(player.id))
         if self.player1.id == player.id:
             self.current_player = self.player2
         elif self.player2.id == player.id:
             self.current_player = self.player1
             self.turn += 1
-            print("Round ended. Next round: {}".format(self.turn))
         else:
             raise Exception("BOARD_INVALID_PLAYER")
-        
+
     def _chooseNobles(self, number):
         selected_nobles = []
         for i in range(number):
-            selected_pos = random.randint(0,len(self.all_nobles))
+            selected_pos = random.randint(0, len(self.all_nobles))
             selected_nobles.append(self.all_nobles.pop(selected_pos))
         self.nobles = selected_nobles
+
 
 class TokenBank:
     def __init__(self, num_players):
@@ -172,9 +182,11 @@ class TokenBank:
         self.tokens = [starting_tokens] * 5 + [5]
 
     def serialize(self):
-        return [self.tokens]
-
+        return {
+            "tokens": self.tokens
+        }
     # update the tokens in the bank.
+
     def update(self, tokens):
         for i, t in enumerate(tokens):
             # ignore the gold coin.
@@ -203,32 +215,38 @@ class PlayerState:
         self.nobles = []
 
     def __str__(self):
-        return "\nPlayer {}:\nPoints: {}\nTokens: {}\nCards: {}Reserves: {}".format(self.id,self.points,self.tokens,self.cards,self.reserved_cards)
-    
+        return "\nPlayer {}:\nPoints: {}\nTokens: {}\nCards: {}Reserves: {}".format(self.id, self.points, self.tokens, self.cards, self.reserved_cards)
+
     def serialize(self):
-        return [
-            self.points,
-            self.cards,
-            self.card_counts,
-            self.tokens,
-        ]
-
+        return {
+            "id": self.id,
+            "turn_order": self.turn_order,
+            "points": self.points,
+            "cards": [card.serialize() for card in self.cards],
+            "reserved_cards": [card.serialize() for card in self.reserved_cards],
+            "card_counts": self.card_counts,
+            "tokens": self.tokens,
+            "nobles": self.nobles
+        }
     # Player to take an action from here
-    def takeAction(self, action:Action, **kwargs):
+
+    def takeAction(self, action: Action, **kwargs):
         if action == Action.BUY_CARD:
-            self._updateTokens(kwargs['tokens'])
-            self.takeCard(kwargs['card'])
+            card = kwargs['card']
+            spent_tokens = self.tokensForCard(card)
+            self._updateTokens(spent_tokens)
+            self.takeCard(card)
 
-        elif action == Action.BUY_RESERVE:
-            self._updateTokens(kwargs['tokens'])
-            self.buyReserve(kwargs['card'])
+        # elif action == Action.BUY_RESERVE:
+        #     self._updateTokens(kwargs['tokens'])
+        #     self.buyReserve(kwargs['card'])
 
-        elif action == Action.RESERVE_CARD:
-            self._updateTokens(kwargs['tokens'])
-            self.reserveCard(kwargs['card'])
+        # elif action == Action.RESERVE_CARD:
+        #     self._updateTokens(kwargs['tokens'])
+        #     self.reserveCard(kwargs['card'])
 
         elif action == Action.TAKE_TOKEN:
-            self._updateTokens(kwargs['tokens'])
+            self.takeToken(kwargs['tokens'])
 
         else:
             raise Exception('EMPTY_ACTION')
@@ -236,19 +254,52 @@ class PlayerState:
         # self._checkNobles()
         self.board.endTurn(self)
 
+    def tokensForCard(self, card):
+        spent_tokens = [0, 0, 0, 0, 0, 0]
+        gold_count = self.tokens[5]
+        for i, cost in enumerate(card.cost):
+            if i == 5:
+                break
+            if cost <= self.tokens[i]:
+                spent_tokens[i] = -cost
+            else:
+                spent_tokens[i] = -self.tokens[i]
+                if gold_count > (cost - self.tokens[i]):
+                    spent_tokens[5] -= (cost - self.tokens[i])
+                    gold_count -= (cost - self.tokens[i])
+                else:
+                    raise Exception("PLAYER_NOT_ENOUGH_TOKENS")
+        return spent_tokens
     # Player is allowed to draw 3 tokens of different colour, or 2 tokens of same colour,
     # provided there are 4 tokens of that colour in the bank
+
     def takeToken(self, tokens):
         if tokens[5] > 0:
             raise Exception('PLAYER_CANNOT_TAKE_GOLD_TOKEN')
-        multiToken = False
+        multiToken = True
+        try:
+            tokens.index(2)
+            multiToken = False
+        except:
+            pass
+
+        tokenCount = sum(tokens)
+        if(not multiToken and tokenCount != 2):
+            raise Exception("PLAYER_TAKING_TOO_MANY_OR_FEW_TOKENS")
+        if(multiToken and tokenCount != 3):
+            raise Exception("PLAYER_TAKING_TOO_MANY_OR_FEW_TOKENS")
+
         for i, token in enumerate(tokens):
-            if token > 2 or (token == 2 and multiToken):
+            if(token > 0 and self.bank.tokens[i] < 1):
+                raise Exception("BANK_NOT_ENOUGH_TOKENS")
+            if(multiToken and token > 1):
+                raise Exception("PLAYER_TAKING_TOO_MANY_TOKENS")
+            if(not multiToken and token > 2):
                 raise Exception('PLAYER_TAKING_TOO_MANY_TOKENS')
             elif token == 2:
                 if self.bank.tokens[i] < 4:
                     raise Exception('BANK_LESS_THAN_4_TOKENS')
-                multiToken = True
+
         self._updateTokens(tokens)
 
     # Player takes updates their hand of cards. The points awarded and token value of the card is added
@@ -257,10 +308,9 @@ class PlayerState:
         self.cards.append(card)
         self.card_counts[card.type] += 1
         self.points += card.value
-        
+        self.board.removeCardFromBoard(card)
         if self.points >= self.board.points_to_win:
             print("PLAYER {} HAS WON!".format(self.id))
-        
 
     # Player buys the reserve card held in his hand.
     def buyReserve(self, card):
@@ -276,7 +326,7 @@ class PlayerState:
 
     # Internal helper function to check if there are enough tokens for purchase.
     # Takes into account gold tokens as wild cards.
-    def _checkValidToken(self,a,b):
+    def _checkValidToken(self, a, b):
         gold_tokens = a[5]
         for token, i in enumerate(b):
             # ignore gold tokens
@@ -291,37 +341,39 @@ class PlayerState:
                 else:
                     return False
         return True
-        
+
     # Internal helper function to update bank tokens.
-    def _updateTokens(self,tokens):
+    def _updateTokens(self, tokens):
         if self._checkValidToken(self.tokens, tokens):
-            self.tokens = [t + tokens[i] for i,t in enumerate(self.tokens)]
+            self.tokens = [t + tokens[i] for i, t in enumerate(self.tokens)]
             self.bank.update(tokens)
         else:
             raise Exception('PLAYER_NOT_ENOUGH_TOKENS')
 
     # Noble visits player.
-    def visitNoble(self,noble):
+    def visitNoble(self, noble):
         self.nobles.append(noble)
         self.points += noble.value
-        
+
         if self.points >= self.board.points_to_win:
             print("PLAYER {} HAS WON!".format(self.id))
 
     # check if player can be visited by noble
     def _checkNobles(self):
         for noble in self.board.nobles:
-            if self._checkValidToken(self.tokens,noble.cost):
+            if self._checkValidToken(self.tokens, noble.cost):
                 self.visitNoble(noble)
                 break
-        
+
 # Helper function to search through a list for a card.
+
+
 def searchCardIndex(cardList, card):
-        card_index = -1
-        for i, reserved_card in enumerate(cardList):
-            if card.id == reserved_card.id:
-                card_index = i
-                break
-        if card_index == -1:
-            raise Exception('CARD_NOT_FOUND')
-        return card_index
+    card_index = -1
+    for i, reserved_card in enumerate(cardList):
+        if card.id == reserved_card.id:
+            card_index = i
+            break
+    if card_index == -1:
+        raise Exception('CARD_NOT_FOUND')
+    return card_index
