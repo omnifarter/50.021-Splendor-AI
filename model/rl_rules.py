@@ -1,6 +1,8 @@
+from copy import deepcopy
 import itertools
 import numpy as np
 import random
+from torch import tensor
 
 card_path = '../data/cards.csv'
 nobles_path = '../data/nobles.csv'
@@ -40,7 +42,7 @@ class Noble:
 
 class TokenBank:
     def __init__(self):
-        self.tokens = [4] * 5 + [5]
+        self.tokens = [4] * 5
 
     def serialize(self):
         return self.tokens
@@ -62,12 +64,11 @@ class PlayerState:
         self.cards = []
         self.card_counts = [0, 0, 0, 0, 0]
         self.reserved_cards = []
-        self.tokens = [0, 0, 0, 0, 0, 0]
+        self.tokens = [0, 0, 0, 0, 0]
         self.nobles = []
 
     def __str__(self):
-        return "\nPlayer {}:\nPoints: {}\nTokens: {}\nCards: {}Reserves: {}".format(self.id, self.points, self.tokens,
-                                                                                    self.cards, self.reserved_cards)
+        return f"\nPlayer: {self.id}\nPoints: {self.points}\nTokens: {self.tokens}\nCards: {self.cards}"
 
     def serialize(self):
         return [
@@ -98,15 +99,16 @@ class PlayerState:
 class Board:
     def __init__(self):
         self.all_cards, self.all_nobles = self._read_data()
-        self.open_cards = [[], [], []]
-        self.deck_cards = [[], [], []]
-        self.nobles = []
+        self.open_cards : list[list[Card]] = [[],[],[]]
+        self.deck_cards : list[list[Card]] = [[],[],[]]
+        self.nobles : list[Noble] = []
 
         self.bank = TokenBank()
         self.player1 = PlayerState(id=0, turn_order=0)
-        self.player2 = PlayerState(id=1, turn_order=1)
-        self.players = itertools.cycle([self.player1, self.player2])
-        self.current_player = self.players.__next__()
+        self.player2 = PlayerState(id=1,turn_order=1)
+        self.list_players = [self.player1, self.player2]
+        self.cycle_players = itertools.cycle(self.list_players)
+        self.current_player = self.player1
         self.turn = 1
         self.points_to_win = 15
 
@@ -117,57 +119,100 @@ class Board:
 
         # draw 4 cards per tier, add to open_cards
         for tier in range(3):
-            self.open_cards[tier].extend(self._draw_cards(tier, 4))
+            self._draw_cards(tier, 4)
 
         # choose 3 nobles
         for i in range(3):
-            idx = random.randint(0, len(self.all_nobles))
+            idx = random.randint(0, len(self.all_nobles) - 1)
             self.nobles.append(self.all_nobles.pop(idx))
+
+        print(f'Round {self.turn}: Start')
 
     def getState(self):
         # returns 1d list of board states
-        # 12 open cards (12, 7), 3 nobles (3, 6), player1 (1, 12), player2 (1, 12), bank (1, 6)
-        dims = (12 * 7) + 2 * 12 + 6 + 18
+        # 12 open cards (12, 7), 3 nobles (3, 6), player1 (1, 11), player2 (1, 11), bank (1, 5)
+        dims = (12 * 7) + (3 * 6) + (2 * 11) + 5
         data = np.zeros(dims)
+        cards_state = np.zeros((12 * 7))
+        nobles_state = np.zeros((3 * 6))
+        players_state = np.zeros(22)
+        bank_state = np.zeros(5)
 
         idx = 0
         for tier in self.open_cards:
             for card in tier:
-                data[idx: idx + 7] = card.serialize()
+                cards_state[idx : idx+7] = card.serialize()
                 idx += 7
 
+        idx = 0
         for noble in self.nobles:
-            data[idx: idx + 6] = noble.serialize()
+            nobles_state[idx : idx+6] = noble.serialize()
             idx += 6
+        
+        idx = 0
+        for player in self.list_players:
+            players_state[idx : idx + 11] = player.serialize()
+            idx += 11
 
-        data[idx: idx + 12] = self.player1.serialize()
-        idx += 12
-        data[idx: idx + 12] = self.player2.serialize()
-        idx += 12
-        data[idx:] = self.bank.serialize()
+        bank_state[:] = self.bank.serialize()
 
-        return data
+        data = np.concatenate((cards_state, nobles_state, players_state, bank_state))
 
+        return tensor(data).float()
+        
     def playerAction(self, action_index):
-        # TODO
-        if action_index == 1:
-            # take tier 1 card 0
-            card = self.open_cards[0].pop(0)
+        # action index is a number between 0 to 26
+        reward = 0
+        if action_index in range(0, 9):
+            # Player buys a card, 9 ways
+            row = (action_index + 1) // 3 - 1
+            col = (action_index + 1) % 3
 
-            # Update player states
-            self.current_player.updateCards(card)
-            self.current_player.updateTokens(card.cost, subtract=True)
+            if col in range(len(self.open_cards[row])):
+                card = self.open_cards[row].pop(col)
+                reward = card.value
 
-            # Update board states
-            self._draw_cards(1, 1)
-            self.bank.update(card.cost)
+                # Update player states
+                self.current_player.updateCards(card)
+                self.current_player.updateTokens(card.cost, subtract=True)
 
-        elif action_index == 2:
-            pass
+                # Update board states
+                self._draw_cards(row, 1)
+                self.bank.update(card.cost)
+
+        elif action_index in range(9, 24):
+            # Player takes a token, 15 ways
+            reward = 1
+            idx = action_index - 9
+            options = {
+                0 : [3, 0, 0, 0, 0],
+                1: [0, 3, 0, 0, 0],
+                2: [0, 0, 3, 0, 0],
+                3: [0, 0, 0, 3, 0],
+                4: [0, 0, 0, 0, 3],
+                5: [1, 1, 1, 0, 0],
+                6: [1, 1, 0, 1, 0],
+                7: [1, 1, 0, 0, 1],
+                8: [1, 0, 1, 1, 0],
+                9: [1, 0, 1, 0, 1],
+                10: [1, 0, 0, 1, 1],
+                11: [0, 1, 1, 1, 0],
+                12: [0, 1, 1, 0, 1],
+                13: [0, 1, 0, 1, 1],
+                14: [0, 0, 1, 1, 1]
+                }
+
+            tokens = options[idx]
+            self.current_player.updateTokens(tokens)
+            self.bank.update(tokens, True)
 
         # at the end of player action, check nobles
         self._check_nobles()
-        self._end_player()
+        check_winner = self._end_player()
+        if check_winner:
+            reward = 3 if check_winner == self.list_players[0] else -1 # always favour player 0
+        done = True if check_winner else False
+        return reward, done
 
     def _read_data(self):
         temp_cards = np.genfromtxt(card_path, dtype=np.int32, delimiter=',', skip_header=1).tolist()
@@ -187,21 +232,25 @@ class Board:
 
     def _draw_cards(self, tier, num_cards):
         # remove cards from the specified tier deck and add to list of open cards
-        idx = []
+        idx = 0
         cards = []
-        for i in range(num_cards):
-            idx.append(random.randint(0, len(self.deck_cards[tier])))
 
-        for i in idx:
-            cards.append(self.deck_cards[tier].pop(i))
-        return cards
+        if len(self.deck_cards[tier]) - 1 <= 0:
+            return False
+
+        for i in range(num_cards):
+            idx = random.randint(0, len(self.deck_cards[tier]) - 1)
+            card = self.deck_cards[tier].pop(idx)
+            cards.append(card)
+
+        self.open_cards[tier].extend(cards)
 
     def _check_nobles(self):
-        # TODO:checks if any nobles can be given to current player
-        # for noble in self.nobles:
-
-        # if noble can be given, update player states, remove noble from board
-        pass
+        # check if current player can be visited by noble
+        for noble in self.nobles:
+            if self.current_player.card_counts >= noble.cost:
+                self.current_player.updateNoble(noble)
+                self.nobles.remove(noble)
 
     def _end_player(self):
         # check for win condition, return player
@@ -209,7 +258,11 @@ class Board:
             print(f'Player {self.current_player.id} has won! {self.current_player.points} points!')
             return self.current_player
         else:
-            if self.current_player.id == self.player2.id:
+            if self.current_player.id == self.list_players[-1].id:
                 self.turn += 1
-            self.current_player = self.players.__next__()
-            print(f'Round {self.turn}: Start')
+                print(f'Round {self.turn}: Start')
+                print(f'Player 0: {self.list_players[0].points} points\tPlayer 1: {self.list_players[1].points} points')
+            self.current_player = next(self.cycle_players)
+            print(f'Player {self.current_player.id} Action: {self.current_player.serialize()}')
+
+        
