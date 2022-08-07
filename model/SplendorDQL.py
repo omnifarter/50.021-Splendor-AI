@@ -1,13 +1,11 @@
-import json
 import math
 import random
-from data.rules import Board
+from rl_rules import Board
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from itertools import count
-from PIL import Image
 
 import torch
 import torch.nn as nn
@@ -18,8 +16,6 @@ from IPython import display
 
 ################### References ##################
 # https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
-#
-#
 #################################################
 
 
@@ -43,20 +39,20 @@ class ReplayMemory(object):
 
 class DQN(nn.Module):
 
-    def __init__(self, input_dims, output_dims=27):
+    def __init__(self, input_dims, output_dims=24):
         super(DQN, self).__init__()
         
-        self.linear_1 = nn.linear(input_dims, 64)
-        self.linear_2 = nn.linear(64, 32)
-        self.linear_3 = nn.linear(32, output_dims)
+        self.linear_1 = nn.Linear(input_dims, 64)
+        self.linear_2 = nn.Linear(64, 32)
+        self.linear_3 = nn.Linear(32, output_dims)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         x = x.to(self.device)
         x = F.relu(self.linear_1(x))
         x = F.relu(self.linear_2(x))
         x = F.relu(self.linear_3(x))
-        x = F.sigmoid(x)
+        x = torch.sigmoid(x)
         return x
 
 
@@ -75,7 +71,7 @@ class SplendorDQN(nn.Module):
         plt.ion()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.input_dims = kwargs.pop('input_dims', 132)
+        self.input_dims = kwargs.pop('input_dims', 129)
         self.model = kwargs.pop('model', DQN(self.input_dims)) # TODO: init model
         self.episode_durations = []
 
@@ -87,9 +83,7 @@ class SplendorDQN(nn.Module):
         self.target_update = kwargs.pop('target_update', 10)
         self.num_episodes = kwargs.pop('num_episodes', 50)
 
-        self.n_actions = kwargs.pop('n_actions', 27)
-
-    ########################## Input Extraction ################################        
+        self.n_actions = kwargs.pop('n_actions', 24) 
 
     ############################ Training ###########################################
 
@@ -108,27 +102,24 @@ class SplendorDQN(nn.Module):
         for i_episode in range(self.num_episodes):
             # Initialize the environment and state
             board = Board()
-            board.startGame()
-            state = board.returnState()
+            state = board.getState()
 
             for t in count():
                 # Select and perform an action
                 action = self._select_action(state)
-                _, reward, done, _ = self.env.step(action.item())
-                reward = torch.tensor([reward], device=self.device)
-
-                # Observe new state
-                current_state = '' # TODO: get current state
+                reward, done = board.playerAction(action.item())
+                
+                            
                 if not done:
-                    next_state = current_screen - last_screen
+                    # game not over, continue to next state
+                    next_state =  board.getState()
                 else:
+                    # someone won, get reward value (sparse rewards)
                     next_state = None
-
-                # Store the transition in memory
-                self.memory.push(state, action, next_state, reward)
-
-                # Move to the next state
-                state = next_state
+                    reward = torch.tensor([reward], device=self.device)
+                    self.memory.push(state, action, next_state, reward)  # Store the transition in memory
+                   
+                state = next_state # Move to the next state
 
                 # Perform one step of the optimization (on the policy network)
                 self._optimize_model()
@@ -141,25 +132,26 @@ class SplendorDQN(nn.Module):
                 self.target_net.load_state_dict(self.policy_net.state_dict())
 
         print('Complete')
-        self.env.render()
-        self.env.close()
+        self._save()
         plt.ioff()
+        plt.savefig(f'../save/graph.png')
         plt.show()
+        
 
-    def _select_action(self, state):
-        global steps_done
+    def _select_action(self, state: torch.Tensor):
         sample = random.random()
         eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * \
-            math.exp(-1. * steps_done / self.eps_decay)
-        steps_done += 1
+            math.exp(-1. * self.steps_done / self.eps_decay)
+        self.steps_done += 1
         if sample > eps_threshold:
             with torch.no_grad():
                 # t.max(1) will return largest column value of each row.
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
-                return self.policy_net(state).max(1)[1].view(1, 1)
+                state = torch.reshape(state[None, :], shape=(1, 129))
+                return self.policy_net(state).max(1)[1].view(-1, 1)
         else:
-            return torch.tensor([[random.randrange(self.n_actions)]], device=self.device, dtype=torch.long)
+            return torch.tensor([[random.randrange(0, self.n_actions)]], device=self.device, dtype=torch.long)
 
     def _plot_durations(self):
         plt.figure(2)
@@ -224,5 +216,8 @@ class SplendorDQN(nn.Module):
         for param in self.policy_net.parameters():
             param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
+
+    def _save(self, filepath='DQL.pth'):
+        torch.save(self.target_net.state_dict(), f'../save/{filepath}')
 
         ######################################################################
