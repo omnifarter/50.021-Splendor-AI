@@ -1,3 +1,4 @@
+import logging
 from copy import deepcopy
 import itertools
 import numpy as np
@@ -20,7 +21,7 @@ class Card:
         self.cost = data[3:]
 
     def __repr__(self):
-        return f"Card {self.id}:\nTier: {self.tier} \nValue: {self.value}\nType: {self.type}\nCost: {self.cost}"
+        return f"Card {self.id}, Tier: {self.tier}, Value: {self.value}, Type: {self.type}, Cost: {self.cost}"
 
     def serialize(self):
         return [self.value, self.type, *self.cost]
@@ -68,7 +69,10 @@ class PlayerState:
         self.nobles = []
 
     def __str__(self):
-        return f"\nPlayer: {self.id}\nPoints: {self.points}\nTokens: {self.tokens}\nCards: {self.cards}"
+        return f"\nPlayer: {self.id}\nPoints: {self.points}\nTokens: {self.tokens}\nCards: {self.card_counts}"
+
+    def __repr__(self):
+        return f"Player({self.id}, {self.points}, {self.tokens}, {self.card_counts})"
 
     def serialize(self):
         return [
@@ -97,6 +101,27 @@ class PlayerState:
 # 1. Control changes to board state
 # 2. Controls changes to player state
 class Board:
+
+    token_options =  {
+                0 : [2, 0, 0, 0, 0],
+                1: [0, 2, 0, 0, 0],
+                2: [0, 0, 2, 0, 0],
+                3: [0, 0, 0, 2, 0],
+                4: [0, 0, 0, 0, 2],
+                5: [1, 1, 1, 0, 0],
+                6: [1, 1, 0, 1, 0],
+                7: [1, 1, 0, 0, 1],
+                8: [1, 0, 1, 1, 0],
+                9: [1, 0, 1, 0, 1],
+                10: [1, 0, 0, 1, 1],
+                11: [0, 1, 1, 1, 0],
+                12: [0, 1, 1, 0, 1],
+                13: [0, 1, 0, 1, 1],
+                14: [0, 0, 1, 1, 1],
+                15: [0, 0, 0, 0, 0],
+                # stupid workaround: let players pass
+                }
+
     def __init__(self):
         self.all_cards, self.all_nobles = self._read_data()
         self.open_cards : list[list[Card]] = [[],[],[]]
@@ -126,7 +151,7 @@ class Board:
             idx = random.randint(0, len(self.all_nobles) - 1)
             self.nobles.append(self.all_nobles.pop(idx))
 
-        print(f'Round {self.turn}: Start')
+        logging.info(f'Round {self.turn}: Start')
 
     def getState(self):
         # returns 1d list of board states
@@ -161,50 +186,36 @@ class Board:
         return tensor(data).float()
         
     def playerAction(self, action_index):
-        # action index is a number between 0 to 26
+        # action index is a number between 0 to 12+16=28
         reward = 0
-        if action_index in range(0, 9):
+        if action_index in range(0, 12):
             # Player buys a card, 9 ways
-            row = (action_index + 1) // 3 - 1
-            col = (action_index + 1) % 3
+            row = action_index // 4
+            col = action_index  % 4
 
             if col in range(len(self.open_cards[row])):
                 card = self.open_cards[row].pop(col)
                 reward = card.value
 
+                cost = [max(card_cost - card_counts, 0)
+                        for card_cost, card_counts in zip(card.cost, self.current_player.card_counts)]
+
                 # Update player states
                 self.current_player.updateCards(card)
-                self.current_player.updateTokens(card.cost, subtract=True)
+                self.current_player.updateTokens(cost, subtract=True)
 
                 # Update board states
                 self._draw_cards(row, 1)
-                self.bank.update(card.cost)
+                self.bank.update(cost)
 
-        elif action_index in range(9, 24):
+        elif action_index in range(12, 28):
             # Player takes a token, 15 ways
             reward = 1
-            idx = action_index - 9
-            options = {
-                0 : [2, 0, 0, 0, 0],
-                1: [0, 2, 0, 0, 0],
-                2: [0, 0, 2, 0, 0],
-                3: [0, 0, 0, 2, 0],
-                4: [0, 0, 0, 0, 2],
-                5: [1, 1, 1, 0, 0],
-                6: [1, 1, 0, 1, 0],
-                7: [1, 1, 0, 0, 1],
-                8: [1, 0, 1, 1, 0],
-                9: [1, 0, 1, 0, 1],
-                10: [1, 0, 0, 1, 1],
-                11: [0, 1, 1, 1, 0],
-                12: [0, 1, 1, 0, 1],
-                13: [0, 1, 0, 1, 1],
-                14: [0, 0, 1, 1, 1]
-                }
+            idx = action_index - 12
 
-            tokens = options[idx]
+            tokens = self.token_options[idx]
             self.current_player.updateTokens(tokens)
-            self.bank.update(tokens, True)
+            self.bank.update(tokens, subtract=True)
 
         # at the end of player action, check nobles
         self._check_nobles()
@@ -214,49 +225,38 @@ class Board:
         done = True if check_winner else False
         return reward, done
 
-    def can_take_tokens(self, tokens):
+    def can_take_tokens(self, request_tokens):
         return all(request_token <= bank_token and ((request_token < 2) or (bank_token >= 4))
-                   for request_token, bank_token in zip(tokens, self.bank.tokens))
+                   for request_token, bank_token in zip(request_tokens, self.bank.tokens))
 
-    def can_buy_card(self, player: PlayerState, card:Card):
+    def can_buy_card(self, player: PlayerState, card: Card):
         # doesn't work with gold tokens
-        return all(cost_token <= player_token + player_card
+        return all(cost_token - player_card <= player_token
                    for player_token, player_card, cost_token in zip(player.tokens, player.card_counts, card.cost))
 
     def can_take_action(self, action_index):
-        if action_index in range(0, 9):
+        if action_index in range(0, 12):
             # Player buys a card, 9 ways
-            row = (action_index + 1) // 3 - 1
-            col = (action_index + 1) % 3
-            return self.can_buy_card(self.current_player, self.open_cards[row][col])
+            row = action_index // 4
+            col = action_index % 4
+            return len(self.open_cards[row]) > col and self.can_buy_card(self.current_player, self.open_cards[row][col])
 
-        elif action_index in range(9, 24):
+        elif action_index in range(12, 28):
             # Player takes a token, 15 ways
-            idx = action_index - 9
-            options = {
-                0: [2, 0, 0, 0, 0],
-                1: [0, 2, 0, 0, 0],
-                2: [0, 0, 2, 0, 0],
-                3: [0, 0, 0, 2, 0],
-                4: [0, 0, 0, 0, 2],
-                5: [1, 1, 1, 0, 0],
-                6: [1, 1, 0, 1, 0],
-                7: [1, 1, 0, 0, 1],
-                8: [1, 0, 1, 1, 0],
-                9: [1, 0, 1, 0, 1],
-                10: [1, 0, 0, 1, 1],
-                11: [0, 1, 1, 1, 0],
-                12: [0, 1, 1, 0, 1],
-                13: [0, 1, 0, 1, 1],
-                14: [0, 0, 1, 1, 1]
-                }
-            return self.can_take_tokens(options[idx])
+            idx = action_index - 12
+            return self.can_take_tokens(self.token_options[idx])
 
     def possible_actions(self):
-        return [action for action in range(24) if self.can_take_action(action)]
+        return [action for action in range(28) if self.can_take_action(action)]
 
     def possible_actions_mask(self):
-        return [int(self.can_take_action(action)) for action in range(24)]
+        return [int(self.can_take_action(action)) for action in range(28)]
+
+    def human_action_description(self, action):
+        if action < 12:
+            return f"Buy card {self.open_cards[action//4][action%4]}"
+        elif action < 28:
+            return f"Take tokens {self.token_options[action-12]}"
 
     def _read_data(self):
         temp_cards = np.genfromtxt(card_path, dtype=np.int32, delimiter=',', skip_header=1).tolist()
@@ -299,14 +299,17 @@ class Board:
     def _end_player(self):
         # check for win condition, return player
         if self.current_player.points >= self.points_to_win:
-            print(f'Player {self.current_player.id} has won! {self.current_player.points} points!')
+            logging.info(f'Player {self.current_player.id} has won! {self.current_player.points} points!')
             return self.current_player
         else:
             if self.current_player.id == self.list_players[-1].id:
                 self.turn += 1
-                print(f'Round {self.turn}: Start')
-                print(f'Player 0: {self.list_players[0].points} points\tPlayer 1: {self.list_players[1].points} points')
+                logging.info(f'Round {self.turn}: Start')
+                logging.info(f'Player 0: {self.list_players[0].points} points\tPlayer 1: {self.list_players[1].points} points')
             self.current_player = next(self.cycle_players)
-            print(f'Player {self.current_player.id} Action: {self.current_player.serialize()}')
+            logging.info(f'Player {self.current_player.id} Action: {self.current_player.serialize()}')
+
+    def __str__(self):
+        return f"Players: {self.list_players}\nCards: {self.open_cards}\nTokens: {self.bank.tokens}"
 
         
