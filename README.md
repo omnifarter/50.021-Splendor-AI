@@ -21,7 +21,7 @@ For this project, the game will be played by 2 players. At each turn, a player c
 
 Navigate to the `./data` folder and run `flask run` to start the backend.
 
-In a separate terminal, navigate to the `./ui` folder and run:
+To start the frontend, in a separate terminal, navigate to the `./ui` folder and run:
 ```
 npm i
 npm start
