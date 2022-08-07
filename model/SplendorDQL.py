@@ -90,6 +90,7 @@ class SplendorDQN(nn.Module):
         self.Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
+        self.name = kwargs.pop('name', None)
         self.batch_size = kwargs.pop('batch_size', 128)
         self.gamma = kwargs.pop('gamma', 0.999)
         self.eps_start = kwargs.pop('eps_start', 0.9)
@@ -157,7 +158,7 @@ class SplendorDQN(nn.Module):
         self._save()
         plt.ioff()
         plt.figtext(.6, .8, f"Games Won: {total_wins} / {self.num_episodes}", size=12)
-        plt.savefig(f'../save/graph.png')
+        plt.savefig(f'../save/{self.name}.png')
         plt.show()
         sys.stdout.close()
         return
@@ -251,6 +252,8 @@ class SplendorDQN(nn.Module):
         self.optimizer.step()
 
     def _save(self, filepath='DQL.pth'):
+        if self.name:
+            filepath = self.name
         torch.save(self.target_net.state_dict(), f'../save/{filepath}')
 
         ######################################################################

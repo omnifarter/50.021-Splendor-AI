@@ -1,4 +1,5 @@
 from SplendorDQL import SplendorDQN
 
-dqn = SplendorDQN(num_episodes=500)
+episodes = 300
+dqn = SplendorDQN(num_episodes=episodes, name=f'SingleDQN_{episodes}games')
 dqn.train()
