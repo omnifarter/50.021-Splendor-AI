@@ -152,7 +152,7 @@ class MCTS:
         return moveProbs
 
 
-def random_eval(iter=10, max_moves=100):
+def random_eval(iter=1, max_moves=100):
     def eval_fn(board: rl_rules.Board):
         board = copy.deepcopy(board)
         policy = [1]*28
@@ -172,13 +172,14 @@ if __name__ == "__main__":
     player = 0
     ai = [True, True]
     board = rl_rules.Board()
-    mcts = MCTS(random_eval())
+    mcts = MCTS(random_eval(iter=10))
     for i in itertools.count():
         print(board)
         edge = Edge(None, None)
         node = Node(board, edge)
+        print(f"Player {player}:", end=" ")
         if ai[player]:
-            move_probs = mcts.search(node, select_timeout=5)
+            move_probs = mcts.search(node, select_timeout=20)
             move = max(move_probs, key=lambda t: t[1])
             print(board.human_action_description(move[0]))
             reward, done = board.playerAction(move[0])

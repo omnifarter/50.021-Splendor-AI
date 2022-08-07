@@ -37,6 +37,9 @@ class Noble:
     def __str__(self):
         return f"ID: {self.id}, Cost: {self.cost}"
 
+    def __repr__(self):
+        return self.__str__()
+
     def serialize(self):
         return [*self.cost, self.points]
 
@@ -311,6 +314,6 @@ class Board:
             logging.info(f'Player {self.current_player.id} Action: {self.current_player.serialize()}')
 
     def __str__(self):
-        return f"Players: {self.list_players}\nCards: {self.open_cards}\nTokens: {self.bank.tokens}"
+        return f"Players: {self.list_players}\nCards: {self.open_cards}\nTokens: {self.bank.tokens}\nNobles: {self.nobles}"
 
         
