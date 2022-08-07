@@ -12,7 +12,7 @@ from typing import Any, Callable, List, Tuple
 
 import numpy as np
 
-from model import rl_rules
+from model import mcts_rules
 
 
 class Edge:
@@ -155,7 +155,7 @@ class MCTS:
 def random_eval(iter=1, max_moves=100):
     def eval_fn(board: rl_rules.Board):
         board = copy.deepcopy(board)
-        policy = [1]*28
+        policy = [3]*4 + [4]*4 + [5]*4 + [2]*16
         out = 0
         for i in range(iter):
             board2 = copy.deepcopy(board)

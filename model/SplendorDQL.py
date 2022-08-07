@@ -1,6 +1,6 @@
 import math
 import random
-from rl_rules import Board
+from mcts_rules import Board
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
