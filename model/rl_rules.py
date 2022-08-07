@@ -187,7 +187,7 @@ class Board:
         
     def playerAction(self, action_index):
         # action index is a number between 0 to 12+16=28
-        assert(self.can_take_action(action_index))
+        # assert(self.can_take_action(action_index))
         reward = 0
         if action_index in range(0, 12):
             # Player buys a card, 9 ways
@@ -293,7 +293,7 @@ class Board:
     def _check_nobles(self):
         # check if current player can be visited by noble
         for noble in self.nobles:
-            if self.current_player.card_counts >= noble.cost:
+            if all(card_count >= cost for card_count, cost in zip(self.current_player.card_counts, noble.cost)):
                 self.current_player.updateNoble(noble)
                 self.nobles.remove(noble)
 

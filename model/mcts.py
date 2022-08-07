@@ -141,7 +141,7 @@ class MCTS:
             i += 1
             selected_node = self.select(rootNode)
             self.expand_and_eval(selected_node)
-        logging.info(f"{i} iterations")
+        print(f"{i} iterations")
         N_sum = 0
         moveProbs = []
         for edge, _ in rootNode.childEdgeNode:
@@ -152,15 +152,15 @@ class MCTS:
         return moveProbs
 
 
-def random_eval(iter=1, max_moves=100):
+def random_eval(iter=10, max_moves=100):
     def eval_fn(board: rl_rules.Board):
         board = copy.deepcopy(board)
         policy = [1]*28
         out = 0
         for i in range(iter):
+            board2 = copy.deepcopy(board)
             for j in range(max_moves):
-                logging.info(board)
-                reward, done = board.playerAction(random.choice(board.possible_actions()))
+                reward, done = board2.playerAction(random.choice(board2.possible_actions()))
                 if done:
                     out += np.sign(reward)
                     break
@@ -170,14 +170,15 @@ def random_eval(iter=1, max_moves=100):
 
 if __name__ == "__main__":
     player = 0
+    ai = [True, True]
     board = rl_rules.Board()
     mcts = MCTS(random_eval())
     for i in itertools.count():
         print(board)
         edge = Edge(None, None)
         node = Node(board, edge)
-        if player == 0:
-            move_probs = mcts.search(node, select_timeout=1)
+        if ai[player]:
+            move_probs = mcts.search(node, select_timeout=5)
             move = max(move_probs, key=lambda t: t[1])
             print(board.human_action_description(move[0]))
             reward, done = board.playerAction(move[0])
