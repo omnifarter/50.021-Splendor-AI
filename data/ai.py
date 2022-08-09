@@ -1,4 +1,5 @@
 from re import I
+import time
 from rules import *
 import copy
 
@@ -8,11 +9,11 @@ POINTS_VALUE = 100
 T3_CARD_VALUE = 40
 T2_CARD_VALUE = 30
 T1_CARD_VALUE = 20  # cards must have a value higher than their tokens
+GOLD_TOKEN_VALUE = 2
+BASE_TOKEN_VALUE = 1
 
 # used to give additional value to buying a card, rather than holding cards.
 CAN_BUY_REGULARIZER = 15
-GOLD_TOKEN_VALUE = 2
-BASE_TOKEN_VALUE = 1
 
 
 class MinMaxBot:
@@ -136,21 +137,17 @@ class MinMaxBot:
                     if parent_score['value'] > best_current_action['value']:
                         print("PRUNED")
                         break
-        # if depth == 2:
-        #     print('as the human, i deemed that this the opponent will make this move',
-        #           best_opponent_action)
-        #     print('Thus, i will make this move', best_current_action)
-        # if depth == 1:
-        #     print('as the AI, i deemed that this the opponent will make this move',
-        #           best_opponent_action)
-        #     print('Thus, i will make this move', best_current_action)
 
         return best_current_action
 
     def ai_move(self):
         if self.board.current_player.id != 1:
             raise Exception('NOT_AI_TURN')
+        start = time.time()
         best_move = self.minimax(1, self.board, True, {"value": -1e10})
+
+        print('calculated best move in {} s', time.time() - start)
+
         print('best_move', best_move)
         self.board.current_player.takeAction(
             best_move['action'], **best_move['kwargs'])
@@ -222,7 +219,8 @@ class MinMaxBot:
                         can_buy_value += T2_CARD_VALUE
                     else:
                         can_buy_value += T3_CARD_VALUE
-                    # We must break here, else the AI will keep collecting as much "can_buy" cards without actually buying them.
+                    # We must break here, else the AI will keep collecting
+                    # as much "can_buy" cards without actually buying them.
                     can_buy_flag = True
                     break
 
